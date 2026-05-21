@@ -1,0 +1,17 @@
+{
+  "env_name": "kinetix",
+  "evaluation_settings": {
+    "repeat_actions": 16,
+    "history_length": 5,
+    "debug_mode": false
+  },
+  "paths": {
+    "levels_base": "src/vendor/kinetix_suite/levels/",
+    "log_base": "tmp_log/03_kinetix/",
+    "log_subfolder_structure": "VLA/unan/"
+  },
+  "metadata_template": {
+      "prompt_format": "VLA",
+      "annotation_mode": "unanno"
+  }
+}

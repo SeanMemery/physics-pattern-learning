@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ env_id }}">{{ env_id }}</a> / <a href="/runs/{{ env_id }}/{{ run_id }}">{{ run_id }}</a> / <a href="/runs/{{ env_id }}/{{ run_id }}/labels/{{ label_name }}">{{ label_name }}</a> / <a href="/runs/{{ env_id }}/{{ run_id }}/labels/{{ label_name }}/candidates/{{ candidate.name }}">{{ candidate.name }}</a> / diff</p>
+  <h1>{{ candidate.name }} diff</h1>
+  <p>Unified diffs between this candidate and the parent candidates used to generate it.</p>
+</section>
+
+<section class="panel">
+  <div class="panel-header-row">
+    <div>
+      <h2>Diff overview</h2>
+      <p class="metric-subtle">Each block compares the saved child source against one parent source, using a standard git-style unified diff.</p>
+    </div>
+    <div class="button-row">
+      <a class="secondary-button" href="/runs/{{ env_id }}/{{ run_id }}/labels/{{ label_name }}/candidates/{{ candidate.name }}">Back to candidate</a>
+    </div>
+  </div>
+
+  <div class="metric-stack compact-metric-stack">
+    <div class="metric-row"><span>Candidate</span><strong>{{ candidate.name }}</strong></div>
+    <div class="metric-row"><span>UID</span><strong>{{ candidate.uid or "—" }}</strong></div>
+    <div class="metric-row"><span>Origin</span><strong>{{ candidate.origin or "—" }}</strong></div>
+    <div class="metric-row"><span>Parent count</span><strong>{{ parent_candidates|length }}</strong></div>
+  </div>
+</section>
+
+{% if diff_sections %}
+  {% for section in diff_sections %}
+  <section class="panel">
+    <div class="panel-header-row">
+      <div>
+        <h2>{{ section.title }}</h2>
+        <p class="metric-subtle">
+          {% if section.parent %}
+          Parent <a href="/runs/{{ env_id }}/{{ run_id }}/labels/{{ label_name }}/candidates/{{ section.parent.name }}">{{ section.parent.name }}</a>
+          {% if section.parent.uid %} · UID {{ section.parent.uid }}{% endif %}
+          {% else %}
+          Parent source unavailable
+          {% endif %}
+        </p>
+      </div>
+    </div>
+    {% if section.error %}
+    <p class="empty">{{ section.error }}</p>
+    {% else %}
+    <pre class="code-block diff-code-block"><code>{{ section.diff_text }}</code></pre>
+    {% endif %}
+  </section>
+  {% endfor %}
+{% else %}
+<section class="panel">
+  <h2>No parent diff available</h2>
+  <p class="empty">This candidate has no recorded parents, so there is nothing to diff against.</p>
+</section>
+{% endif %}
+{% endblock %}

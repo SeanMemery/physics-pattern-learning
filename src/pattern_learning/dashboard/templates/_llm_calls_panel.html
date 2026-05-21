@@ -1,0 +1,22 @@
+{% if run %}
+<section class="panel workspace-panel llm-calls-panel">
+  <h2>LLM calls</h2>
+  {% if run.llm_calls %}
+  <div class="metric-subtle">{{ run.llm_calls|length }} recorded FunSearch chat-completion calls.</div>
+  <div class="llm-calls-list">
+    {% for call in run.llm_calls %}
+    <a class="llm-call-item llm-call-summary llm-call-link" href="{{ llm_call_base_url }}/{{ call.sequence }}">
+        <span class="llm-call-seq">#{{ call.sequence }}</span>
+        <span class="llm-call-label">{{ call.label or "—" }}</span>
+        <span class="llm-call-time">{{ display_time(call.created_at) if call.created_at else "—" }}</span>
+        <span class="llm-call-worker">w{{ call.worker if call.worker is not none else "—" }}</span>
+        <span class="llm-call-model">{{ call.model or "unknown-model" }}</span>
+        <span class="llm-call-duration">{{ format_duration(call.duration_seconds) }} write</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">No LLM calls recorded for this run.</p>
+  {% endif %}
+</section>
+{% endif %}

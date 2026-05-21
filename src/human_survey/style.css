@@ -1,0 +1,264 @@
+.jspsych-content {
+    max-width: 1200px;
+}
+
+body {
+    background: linear-gradient(180deg, #f6f4ef 0%, #ece7dd 100%);
+    color: #171512;
+    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+.jspsych-btn {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #15514b;
+    color: white;
+    border: none;
+    border-radius: 999px;
+    transition: background-color 0.2s ease;
+}
+
+.jspsych-btn:hover {
+    background-color: #103f3a;
+}
+
+.jspsych-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.welcome-container {
+    text-align: center;
+    margin: 24px;
+}
+
+.welcome-title {
+    font-size: 2.4rem;
+    margin-bottom: 16px;
+}
+
+.welcome-description {
+    font-size: 1.15rem;
+    margin-bottom: 14px;
+    color: #4d4942;
+}
+
+.welcome-start {
+    font-size: 1.4rem;
+    color: #15514b;
+}
+
+.trial-container {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.trial-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    color: #3e3831;
+}
+
+.video-summary-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 24px;
+    align-items: start;
+}
+
+.video-wrapper,
+.summary-wrapper {
+    background: rgba(255, 253, 248, 0.92);
+    border: 1px solid #d7cdbc;
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(33, 27, 19, 0.08);
+    padding: 16px;
+}
+
+.video-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.summary-video {
+    width: 100%;
+    max-height: 560px;
+    background: #000;
+    border-radius: 10px;
+}
+
+.video-wrapper-pooltool {
+    min-height: 0;
+}
+
+.summary-video-pooltool {
+    width: 100%;
+    max-width: 100%;
+    max-height: 560px;
+    height: auto;
+}
+
+.summary-wrapper h3 {
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+
+.env-help-tooltip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.env-help-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #6b5b41;
+}
+
+.env-help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #b9893f;
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: default;
+    user-select: none;
+}
+
+.env-help-text {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 320px;
+    background: #1f2933;
+    color: #f7fafc;
+    padding: 10px 12px;
+    border-radius: 8px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+    transition: opacity 0.2s ease;
+    text-align: left;
+    line-height: 1.45;
+    font-weight: 400;
+    z-index: 6;
+}
+
+.env-help-tooltip:hover .env-help-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+.summary-box {
+    background: #f8f6f1;
+    border: 1px solid #e0d8ca;
+    border-radius: 12px;
+    padding: 14px;
+    line-height: 1.6;
+    max-height: 560px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    text-align: left;
+}
+
+.timer-message {
+    text-align: center;
+    color: #645d54;
+    font-weight: 700;
+    padding: 6px;
+}
+
+.rating-prompt {
+    text-align: center;
+    margin-top: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.error-message {
+    color: #8b3426;
+    font-weight: 700;
+    margin: 20px auto;
+    text-align: center;
+    max-width: 760px;
+}
+
+.help-tooltip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #15514b;
+    color: #fff;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: default;
+    user-select: none;
+}
+
+.help-text {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: 130%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 280px;
+    background: #1f2933;
+    color: #f7fafc;
+    padding: 10px 12px;
+    border-radius: 8px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+    transition: opacity 0.2s ease;
+    text-align: left;
+    line-height: 1.4;
+    font-weight: 400;
+    z-index: 5;
+}
+
+.help-tooltip:hover .help-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+@media (max-width: 960px) {
+    .video-summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .env-help-label {
+        font-size: 0.82rem;
+    }
+
+    .video-wrapper-pooltool {
+        min-height: 0;
+    }
+
+    .summary-video-pooltool {
+        width: 100%;
+        max-width: 100%;
+    }
+}

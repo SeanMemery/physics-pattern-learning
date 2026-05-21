@@ -1,0 +1,42 @@
+{% set timing_summary = run.raw_run_payload.get("timing_summary", {}) if run else {} %}
+{% set search_rows = timing_summary.get("groups", {}).get("search", []) %}
+{% set evaluation_rows = timing_summary.get("groups", {}).get("evaluation", []) %}
+{% if timing_summary %}
+<section class="panel compact-timing-panel">
+  <h2>Timing</h2>
+  <div class="chip-row evolution-settings compact-timing-chips">
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">wall</span>
+      <strong class="stat-value stat-value-small">{{ format_duration(timing_summary.get("total_wall_seconds")) }}</strong>
+    </div>
+    {% for entry in search_rows[:3] %}
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">{{ entry.label }}</span>
+      <strong class="stat-value stat-value-small">{{ format_duration(entry.average_seconds) }}</strong>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if search_rows %}
+  <div class="compact-metric-list">
+    {% for entry in search_rows %}
+    <div class="metric-row compact-metric-row">
+      <span>{{ entry.label }}</span>
+      <strong>{{ format_duration(entry.average_seconds) }} avg</strong>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if evaluation_rows %}
+  <div class="compact-metric-list">
+    {% for entry in evaluation_rows %}
+    <div class="metric-row compact-metric-row">
+      <span>{{ entry.label }}</span>
+      <strong>{{ format_duration(entry.average_seconds) }} avg</strong>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}

@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ env_id }}">{{ env_id }}</a> / <a href="/runs/{{ env_id }}/{{ run_id }}">{{ run_id }}</a> / {{ label_summary.name }}</p>
+  <h1>{{ label_summary.name }}</h1>
+  <p>Per-label search progress, candidate list, and recent evolutionary events for this learned pattern.</p>
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <span class="stat-label">Candidates</span>
+      <strong class="stat-value">{{ label_summary.candidate_count if label_summary.candidate_count else (provisional_label.candidate_evaluations if provisional_label else 0) }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Best reward</span>
+      <strong class="stat-value">{{ "%.3f"|format(label_summary.best_candidate.average_score) if label_summary.best_candidate and label_summary.best_candidate.average_score is not none else ("%.3f"|format(provisional_label.best_score) if provisional_label and provisional_label.best_score is not none else "—") }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Validation</span>
+      <strong class="stat-value">{{ "%.3f"|format(label_summary.best_candidate.val_score) if label_summary.best_candidate and label_summary.best_candidate.val_score is not none else ("%.3f"|format(provisional_label.best_validation_score) if provisional_label and provisional_label.best_validation_score is not none else "—") }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Events</span>
+      <strong class="stat-value">{{ label_summary.iteration_history|length if label_summary.iteration_history else (provisional_label.event_count if provisional_label else 0) }}</strong>
+    </div>
+  </div>
+</section>
+
+<div class="button-row">
+  <a class="secondary-button" href="/runs/{{ env_id }}/{{ run_id }}">Back to run</a>
+</div>
+
+<section class="content-grid">
+  <section class="panel">
+    <h2>Label summary</h2>
+    <div class="metric-stack">
+      <div class="metric-row"><span>Best reward</span><strong>{{ "%.3f"|format(label_summary.best_candidate.average_score) if label_summary.best_candidate and label_summary.best_candidate.average_score is not none else ("%.3f"|format(provisional_label.best_score) if provisional_label and provisional_label.best_score is not none else "—") }}</strong></div>
+      <div class="metric-row"><span>Train reward</span><strong>{{ "%.3f"|format(label_summary.best_candidate.train_score) if label_summary.best_candidate and label_summary.best_candidate.train_score is not none else ("%.3f"|format(provisional_label.best_score) if provisional_label and provisional_label.best_score is not none else "—") }}</strong></div>
+      <div class="metric-row"><span>Validation reward</span><strong>{{ "%.3f"|format(label_summary.best_candidate.val_score) if label_summary.best_candidate and label_summary.best_candidate.val_score is not none else ("%.3f"|format(provisional_label.best_validation_score) if provisional_label and provisional_label.best_validation_score is not none else "—") }}</strong></div>
+      <div class="metric-row"><span>Candidate count</span><strong>{{ label_summary.candidate_count if label_summary.candidate_count else (provisional_label.candidate_evaluations if provisional_label else 0) }}</strong></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header-row">
+      <div>
+        <h2>{{ "Validation" if current_reward_metric == "validation" else "Training" }} reward over iterations</h2>
+        <p class="metric-subtle">This chart tracks the selected reward metric across the search iterations for this label.</p>
+      </div>
+      <div class="chart-toggle-row">
+        <a class="secondary-button{% if current_reward_metric == 'train' %} is-active{% endif %}" href="{{ reward_metric_toggle.train_url }}">Training reward</a>
+        <a class="secondary-button{% if current_reward_metric == 'validation' %} is-active{% endif %}" href="{{ reward_metric_toggle.validation_url }}">Validation reward</a>
+      </div>
+    </div>
+    {% if label_summary.evolution_loss_series %}
+    <div
+      class="loss-chart"
+      data-chart-title="{{ label_summary.name }} reward over iterations"
+      data-x-label="Iteration"
+      data-metric="{{ current_reward_metric }}"
+      data-points='{{ label_summary.evolution_loss_series | tojson }}'
+    ></div>
+    {% else %}
+    <p class="empty">No reward history was recorded for this label yet.</p>
+    {% endif %}
+  </section>
+</section>
+
+<section class="panel">
+  <h2>Candidates</h2>
+  {% if label_summary.candidates %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Candidate</th>
+        <th>Best</th>
+        <th>Average reward</th>
+        <th>Train reward</th>
+        <th>Validation reward</th>
+        <th>Origin</th>
+        <th>Iteration</th>
+        <th>Errors</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for candidate in label_summary.candidates %}
+      <tr>
+        <td><a href="/runs/{{ env_id }}/{{ run_id }}/labels/{{ label_summary.name }}/candidates/{{ candidate.name }}">{{ candidate.name }}</a></td>
+        <td>{{ "yes" if label_summary.best_candidate and candidate.name == label_summary.best_candidate.name else "" }}</td>
+        <td>{{ "%.3f"|format(candidate.average_score) if candidate.average_score is not none else "—" }}</td>
+        <td>{{ "%.3f"|format(candidate.train_score) if candidate.train_score is not none else "—" }}</td>
+        <td>{{ "%.3f"|format(candidate.val_score) if candidate.val_score is not none else "—" }}</td>
+        <td>{{ candidate.origin or "—" }}</td>
+        <td>{{ candidate.iteration if candidate.iteration is not none else "—" }}</td>
+        <td>{{ candidate.error_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% elif provisional_label %}
+  <p class="metric-subtle">Live provisional view while candidate artifacts are still being written.</p>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Evaluations</th>
+        <th>Best reward</th>
+        <th>Validation reward</th>
+        <th>Best fingerprint</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>{{ provisional_label.candidate_evaluations }}</td>
+        <td>{{ "%.3f"|format(provisional_label.best_score) if provisional_label.best_score is not none else "—" }}</td>
+        <td>{{ "%.3f"|format(provisional_label.best_validation_score) if provisional_label.best_validation_score is not none else "—" }}</td>
+        <td>{{ provisional_label.best_fingerprint or "—" }}</td>
+      </tr>
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No candidates found for this label.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Evolution events</h2>
+  {% if label_summary.iteration_history %}
+  <div class="scroll-table compact-scroll-table">
+    <table class="data-table compact-table">
+      <thead>
+        <tr>
+          <th>Iteration</th>
+          <th>Candidate UID</th>
+          <th>Origin</th>
+          <th>Reward</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in label_summary.iteration_history %}
+        <tr>
+          <td>{{ event.iteration if event.iteration is not none else "—" }}</td>
+          <td>
+            {% set matching_candidates = label_summary.candidates | selectattr("uid", "equalto", event.candidate_uid) | list %}
+            {% if matching_candidates %}
+            <a href="/runs/{{ env_id }}/{{ run_id }}/labels/{{ label_name }}/candidates/{{ matching_candidates[0].name }}">{{ event.candidate_uid or matching_candidates[0].name }}</a>
+            {% else %}
+            {{ event.candidate_uid or "—" }}
+            {% endif %}
+          </td>
+          <td>{{ event.origin or "—" }}</td>
+          <td>{{ "%.3f"|format(event.score) if event.score is not none else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif provisional_events %}
+  <p class="metric-subtle">Live provisional view while evolution artifacts are still being written.</p>
+  <div class="scroll-table compact-scroll-table">
+    <table class="data-table compact-table">
+      <thead>
+        <tr>
+          <th>Eval</th>
+          <th>Fingerprint</th>
+          <th>Reward</th>
+          <th>Validation</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in provisional_events %}
+        <tr>
+          <td>{{ event.evaluation_index if event.evaluation_index is not none else "—" }}</td>
+          <td>{{ event.candidate_fingerprint or "—" }}</td>
+          <td>{{ "%.3f"|format(event.score) if event.score is not none else "—" }}</td>
+          <td>{{ "%.3f"|format(event.validation_score) if event.validation_score is not none else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No evolution events recorded for this label yet.</p>
+  {% endif %}
+</section>
+
+{% include "_reward_chart_script.html" %}
+{% endblock %}

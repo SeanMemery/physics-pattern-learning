@@ -1,0 +1,41 @@
+Repair the {{ environment_id|upper }} detector candidate for the target label `{{ label }}`.
+
+Return Python code only with exactly one function:
+
+def find_pattern(trace):
+    ...
+
+Constraints:
+- no imports
+- inspect only the provided `trace` dict
+- return a list of pattern dicts
+- every emitted pattern must include `label`, `start_timestep`, `end_timestep`, and `parameters`
+- use inclusive timestep spans; if the pattern is point-like, set `start_timestep == end_timestep`
+- choose the narrowest specific timestep span supported by the evidence; do not default to the full trace unless the pattern truly persists for the entire trace
+- `parameters` must include an `object_details` dict keyed by object id or role, with each entry describing the object's role in the pattern, kind/shape-role, and where the pattern starts/ends for that object
+- use the exact target label `{{ label }}`
+- preserve the detector intent unless the validation error requires structural change
+
+Kinetix reminder:
+- the useful signal is in `trace["timesteps"]`, not mostly in `trace["events"]`
+- timestep objects may be rigid bodies, joints, or thrusters
+- rigid-body objects expose state like `position`, `velocity`, `rotation`, `angular_velocity`, `inverse_mass`, `shape_role`, `highlighted`, `vertices`
+- `environment_feedback` events are coarse summaries, not object-level interactions
+- repair detectors so they emit timestep spans, not wall-clock times
+- repair detectors so they pick concrete evidence-backed start/end timesteps, not the entire trace by default
+
+Compact trace example:
+```python
+{"timesteps": [{"objects": [{"kind": "polygon|circle|joint|thruster", "position": [float, float], "velocity": [float, float], "inverse_mass": float, "shape_role": int, "highlighted": bool}]}], "events": [{"kind": "environment_feedback"}], "outcome": {"success": bool, "terminal_status": "str"}}
+```
+
+Validation error:
+- category={{ error_category }}
+- message={{ error_message }}
+- line={{ error_line }}
+- column={{ error_column }}
+
+Broken candidate:
+```python
+{{ broken_code }}
+```

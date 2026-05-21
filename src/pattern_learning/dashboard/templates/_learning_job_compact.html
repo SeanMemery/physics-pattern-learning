@@ -1,0 +1,88 @@
+{% if job.learning_progress and job.learning_progress.progress_summary %}
+{% set progress = job.learning_progress.progress_summary %}
+{% set total_labels = progress.total_labels if progress.total_labels else 0 %}
+{% set completed_labels = progress.completed_labels if progress.completed_labels else 0 %}
+{% set completion_percent = ((completed_labels / total_labels) * 100) if total_labels else 0 %}
+{% set max_worker = namespace(evals=0) %}
+{% if progress.workers %}
+  {% for worker in progress.workers %}
+    {% if worker.candidate_evaluations and worker.candidate_evaluations > max_worker.evals %}
+      {% set max_worker.evals = worker.candidate_evaluations %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+<div class="job-progress-stack">
+  <div class="job-progress-hero">
+    <div class="job-progress-hero-main">
+      <div class="job-progress-kicker">Run progress</div>
+      <div class="job-progress-hero-value">{{ completed_labels }}/{{ total_labels if total_labels else "—" }}</div>
+      <div class="job-progress-hero-label">labels complete</div>
+    </div>
+    <div class="job-progress-hero-side">
+      {% if progress.latest_score is not none %}
+      <div class="job-progress-metric-card">
+        <span class="job-progress-metric-label">Reward</span>
+        <strong class="job-progress-metric-value">{{ "%.3f"|format(progress.latest_score) }}</strong>
+      </div>
+      {% endif %}
+      {% if progress.workers %}
+      <div class="job-progress-metric-card">
+        <span class="job-progress-metric-label">Workers</span>
+        <strong class="job-progress-metric-value">{{ progress.workers|length }}</strong>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="progress-block-tight job-progress-primary-bar">
+    <div class="progress-meta">
+      <span>Label progress</span>
+      <strong>{{ "%.0f%%"|format(completion_percent) }}</strong>
+    </div>
+    <div class="progress-track job-progress-track-large">
+      <span class="progress-fill" style="width: {{ '%.2f'|format(completion_percent) }}%"></span>
+    </div>
+  </div>
+  <div class="job-progress-line">
+    {% if progress.active_label %}
+    <span class="job-progress-pill job-progress-pill-strong">{{ progress.active_label }}</span>
+    {% endif %}
+    {% if progress.stage %}
+    <span class="job-progress-pill stage-{{ progress.stage|replace('_', '-') }}">{{ display_learning_stage(progress.stage) }}</span>
+    {% endif %}
+    {% if progress.candidate_evaluations %}
+    <span class="job-progress-pill">{{ progress.candidate_evaluations }} evals</span>
+    {% endif %}
+  </div>
+  {% if progress.workers %}
+  <div class="job-worker-visual-list">
+    {% for worker in progress.workers[:4] %}
+    {% set worker_eval_percent = ((worker.candidate_evaluations / max_worker.evals) * 100) if worker.candidate_evaluations and max_worker.evals else 0 %}
+    <div class="job-worker-visual-card">
+      <div class="job-worker-visual-header">
+        <span class="job-worker-mini-id">w{{ worker.worker }}</span>
+        <span class="job-worker-stage-pill stage-{{ (worker.stage or 'queued')|replace('_', '-') }}">{{ display_learning_stage(worker.stage or "queued") }}</span>
+      </div>
+      <div class="job-worker-visual-label">{{ worker.label or "Idle" }}</div>
+      <div class="progress-block-tight job-worker-progress-block">
+        <div class="progress-meta">
+          <span>Evals</span>
+          <strong>{{ worker.candidate_evaluations if worker.candidate_evaluations is not none else "—" }}</strong>
+        </div>
+        <div class="progress-track">
+          <span class="progress-fill" style="width: {{ '%.2f'|format(worker_eval_percent) }}%"></span>
+        </div>
+      </div>
+      <div class="job-worker-visual-meta">
+        {% if worker.latest_score is not none %}
+        <span>reward {{ "%.3f"|format(worker.latest_score) }}</span>
+        {% endif %}
+        {% if worker.latest_validation_score is not none %}
+        <span>val {{ "%.3f"|format(worker.latest_validation_score) }}</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}

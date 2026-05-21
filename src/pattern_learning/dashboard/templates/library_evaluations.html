@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ env_id }}">{{ env_id }}</a> / <a href="/runs/{{ env_id }}/{{ run_id }}">{{ run_id }}</a> / library evaluations</p>
+  <h1>{{ env_id }} · {{ run_id }} · Library holdout evaluations</h1>
+  <p>Run repeated quick-eval sweeps with held-out detectors and compare how much each omission hurts library performance.</p>
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <span class="stat-label">Saved runs</span>
+      <strong class="stat-value">{{ saved_library_evaluations|length }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Template</span>
+      <strong class="stat-value">{{ library_eval_template.label }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Baseline seeds</span>
+      <strong class="stat-value">{{ library_eval_template.seed_count }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Pair samples</span>
+      <strong class="stat-value">{{ library_eval_template.pair_holdout_sample_count }}</strong>
+    </div>
+  </div>
+</section>
+
+<div class="button-row">
+  <a class="secondary-button" href="/runs/{{ env_id }}/{{ run_id }}">Back to run</a>
+</div>
+
+<section class="content-grid">
+  <section class="panel">
+    <h2>Launch library holdout eval</h2>
+    <p class="metric-subtle">Uses the standard quick-eval benchmark for the environment, repeated over full-library, single-label holdout, and two-label holdout cases.</p>
+    {% if evaluation_error %}
+      <p class="form-error">{{ evaluation_error }}</p>
+    {% endif %}
+    <form class="launch-form" method="post" action="/runs/{{ env_id }}/{{ run_id }}/library-evaluations/launch">
+      <div class="form-grid compact-form-grid">
+        <label class="worker-control-card">
+          <span>Workers</span>
+          <input name="workers" value="{{ evaluation_values.workers }}" type="number" min="1" />
+        </label>
+        <label>
+          <span>Template</span>
+          <select name="template_name">
+            {% for key, template in template_options.items() %}
+              <option value="{{ key }}" {% if evaluation_values.template_name == key %}selected{% endif %}>{{ key }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span>LM name</span>
+          <input name="model" value="{{ evaluation_values.model or '' }}" type="text" placeholder="blank string default" />
+        </label>
+        <div class="metric-subtle">Quick-eval benchmark preset: {{ library_eval_template.benchmark_preset }}</div>
+        <div class="metric-subtle">{{ run.label_telemetry|length }} labels -> {{ library_eval_template.seed_count }} baseline seeds + {{ run.label_telemetry|length * library_eval_template.seed_count * library_eval_template.single_holdout_repeat_count }} single-holdout evals + {{ library_eval_template.pair_holdout_sample_count * library_eval_template.seed_count }} two-label holdout evals.</div>
+      </div>
+      <div class="metric-subtle">Single holdout repeats per label: {{ library_eval_template.single_holdout_repeat_count }}. Random holdout size: {{ library_eval_template.pair_holdout_size }} labels. Random pair samples: {{ library_eval_template.pair_holdout_sample_count }}. Seeds per case: {{ library_eval_template.seed_count }}.</div>
+      <div class="button-row launch-button-row">
+        <button type="submit" class="primary-button">Add to queue</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Recent jobs</h2>
+    {% if recent_library_evaluation_jobs %}
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>Job</th>
+            <th>Status</th>
+            <th>Case</th>
+            <th>Seed</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for job in recent_library_evaluation_jobs %}
+          <tr>
+            <td>
+              {% if job.metadata.get("library_evaluation_run_id") %}
+                <a href="/runs/{{ env_id }}/{{ run_id }}/library-evaluations/{{ job.metadata.get('library_evaluation_run_id') }}">{{ job.metadata.get("library_evaluation_run_id") }}</a>
+                <div class="metric-subtle">{{ job.job_id }}</div>
+              {% else %}
+                <a href="/jobs/{{ job.job_id }}">{{ job.job_id }}</a>
+              {% endif %}
+            </td>
+            <td><span class="pill status-{{ job.status }}">{{ job.status }}</span></td>
+            <td>{{ job.metadata.get("library_evaluation_case_label") or "—" }}</td>
+            <td>{{ job.metadata.get("benchmark_seed") if job.metadata.get("benchmark_seed") is not none else "—" }}</td>
+            <td>{{ display_time(job.created_at) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">No library holdout jobs launched for this run in this server session.</p>
+    {% endif %}
+  </section>
+</section>
+
+<section class="panel">
+  <h2>Saved library evaluations</h2>
+  {% if saved_library_evaluations %}
+    <div class="scroll-table compact-scroll-table">
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th>Template</th>
+            <th>Progress</th>
+            <th>Baseline</th>
+            <th>Singles</th>
+            <th>Pairs</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for evaluation in saved_library_evaluations %}
+          <tr>
+            <td><a href="/runs/{{ env_id }}/{{ run_id }}/library-evaluations/{{ evaluation.run_id }}">{{ evaluation.run_id }}</a></td>
+            <td>{{ evaluation.template_name }}</td>
+            <td>{{ evaluation.completed_seed_run_count }}/{{ evaluation.total_seed_run_count }} seed evals</td>
+            <td>
+              {% if evaluation.baseline_case and evaluation.baseline_case.mean_success_ratio is not none %}
+                {{ "%.1f%%"|format(evaluation.baseline_case.mean_success_ratio * 100) }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>{{ evaluation.single_holdout_cases|length }} cases</td>
+            <td>{{ evaluation.pair_holdout_cases|length }} cases</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">No library holdout evaluations saved for this run yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ env_id }}">{{ env_id }}</a> / <a href="/runs/{{ env_id }}/{{ run_id }}">{{ run_id }}</a> / <a href="/runs/{{ env_id }}/{{ run_id }}/library-evaluations">library evaluations</a> / {{ evaluation.run_id }}</p>
+  <h1>{{ env_id }} · {{ run_id }} · {{ evaluation.run_id }}</h1>
+  <p>Aggregate quick-eval performance for the full library and held-out detector subsets.</p>
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <span class="stat-label">Template</span>
+      <strong class="stat-value">{{ evaluation.template_name }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Cases</span>
+      <strong class="stat-value">{{ evaluation.total_case_count }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Seed evals</span>
+      <strong class="stat-value">{{ evaluation.completed_seed_run_count }}/{{ evaluation.total_seed_run_count }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Baseline</span>
+      <strong class="stat-value">
+        {% if evaluation.baseline_case and evaluation.baseline_case.mean_success_ratio is not none %}
+          {{ "%.1f%%"|format(evaluation.baseline_case.mean_success_ratio * 100) }}
+        {% else %}
+          —
+        {% endif %}
+      </strong>
+    </div>
+  </div>
+</section>
+
+<div class="button-row">
+  <a class="secondary-button" href="/runs/{{ env_id }}/{{ run_id }}/library-evaluations">Back to library evaluations</a>
+  {% if active_job %}
+    <span class="pill status-{{ active_job.status }}">{{ active_job.status }}</span>
+  {% endif %}
+</div>
+
+<section class="panel">
+  <h2>Baseline</h2>
+  {% if evaluation.baseline_case %}
+    <table class="data-table compact-table">
+      <thead>
+        <tr>
+          <th>Seed</th>
+          <th>Status</th>
+          <th>Success</th>
+          <th>Tasks</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for seed_run in evaluation.baseline_case.seed_runs %}
+        <tr>
+          <td>{{ seed_run.seed }}</td>
+          <td><span class="pill status-{{ seed_run.status }}">{{ seed_run.status }}</span></td>
+          <td>
+            {% if seed_run.evaluation and seed_run.evaluation.success_ratio is not none %}
+              {{ "%.1f%%"|format(seed_run.evaluation.success_ratio * 100) }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>{{ seed_run.evaluation.task_count if seed_run.evaluation else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No baseline case found.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Single-label holdouts</h2>
+  {% if evaluation.single_holdout_cases %}
+    <div class="scroll-table compact-scroll-table">
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>Held out</th>
+            <th>Completed</th>
+            <th>Mean</th>
+            <th>Min</th>
+            <th>Max</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for case in evaluation.single_holdout_cases %}
+          <tr>
+            <td>{{ case.held_out_labels|join(", ") }}</td>
+            <td>{{ case.completed_seed_count }}/{{ case.planned_seed_count }}</td>
+            <td>{{ "%.1f%%"|format(case.mean_success_ratio * 100) if case.mean_success_ratio is not none else "—" }}</td>
+            <td>{{ "%.1f%%"|format(case.min_success_ratio * 100) if case.min_success_ratio is not none else "—" }}</td>
+            <td>{{ "%.1f%%"|format(case.max_success_ratio * 100) if case.max_success_ratio is not none else "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">No single-label holdout cases recorded.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Two-label holdouts</h2>
+  {% if evaluation.pair_holdout_cases %}
+    <div class="scroll-table compact-scroll-table">
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>Held out</th>
+            <th>Completed</th>
+            <th>Mean</th>
+            <th>Min</th>
+            <th>Max</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for case in evaluation.pair_holdout_cases %}
+          <tr>
+            <td>{{ case.held_out_labels|join(", ") }}</td>
+            <td>{{ case.completed_seed_count }}/{{ case.planned_seed_count }}</td>
+            <td>{{ "%.1f%%"|format(case.mean_success_ratio * 100) if case.mean_success_ratio is not none else "—" }}</td>
+            <td>{{ "%.1f%%"|format(case.min_success_ratio * 100) if case.min_success_ratio is not none else "—" }}</td>
+            <td>{{ "%.1f%%"|format(case.max_success_ratio * 100) if case.max_success_ratio is not none else "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">No two-label holdout cases recorded.</p>
+  {% endif %}
+</section>
+{% endblock %}

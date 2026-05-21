@@ -1,0 +1,207 @@
+{% set active_label = selected_evolution_label if selected_evolution_label else (evolution_run.label_telemetry[0] if evolution_run.label_telemetry else None) %}
+{% set active_summary = active_label.evolution_summary if active_label and active_label.evolution_summary else None %}
+{% set active_best = active_label.best_candidate if active_label and active_label.best_candidate else None %}
+<section id="evolution-view" class="panel evolution-panel compact-evolution-panel">
+  <div class="panel-header-row">
+    <div>
+      <h2>Evolution view</h2>
+      <p class="metric-subtle">Inspect one label at a time, then drill into the full label page if you need the complete candidate list.</p>
+    </div>
+    <div class="button-row">
+      {% if active_label %}
+      <a class="secondary-button" href="/runs/{{ evolution_run.env_id }}/{{ evolution_run.run_id }}/labels/{{ active_label.name }}">Open label page</a>
+      {% endif %}
+      {% if evolution_run_url %}
+      <a class="secondary-button" href="{{ evolution_run_url }}">Open run page</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="hero-stats compact-evolution-stats">
+    <div class="stat-chip">
+      <span class="stat-label">Labels</span>
+      <strong class="stat-value">{{ evolution_run.label_telemetry|length }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Candidates</span>
+      <strong class="stat-value">{{ evolution_run.candidate_count }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Best reward</span>
+      <strong class="stat-value">{{ "%.3f"|format(evolution_run.average_score) if evolution_run.average_score is not none else "—" }}</strong>
+    </div>
+    {% if evolution_settings and evolution_settings.get("max_pairs") is not none %}
+    <div class="stat-chip">
+      <span class="stat-label">max_pairs</span>
+      <strong class="stat-value">{{ evolution_settings.get("max_pairs") }}</strong>
+    </div>
+    {% endif %}
+    {% if evolution_settings and evolution_settings.get("histogram_bins") is not none %}
+    <div class="stat-chip">
+      <span class="stat-label">bins</span>
+      <strong class="stat-value">{{ evolution_settings.get("histogram_bins") }}</strong>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if evolution_run.label_telemetry %}
+  <div class="evolution-label-picker">
+    {% for label in evolution_run.label_telemetry %}
+    {% set is_active = active_label and label.name == active_label.name %}
+    <form method="get" action="{{ request.url.path }}#evolution-view" class="evolution-label-pill-form">
+      {% if request.query_params.get("job") %}
+      <input type="hidden" name="job" value="{{ request.query_params.get('job') }}">
+      {% endif %}
+      {% if current_reward_metric %}
+      <input type="hidden" name="reward_metric" value="{{ current_reward_metric }}">
+      {% endif %}
+      <button
+        type="submit"
+        name="evolution_label"
+        value="{{ label.name }}"
+        class="evolution-label-pill{% if is_active %} is-active{% endif %}"
+      >
+        <strong class="evolution-label-pill-name">{{ label.name }}</strong>
+        <span class="evolution-label-pill-meta">
+          {{ label.candidate_count }} cand
+          ·
+          {{ "%.3f"|format(label.best_candidate.average_score) if label.best_candidate and label.best_candidate.average_score is not none else "—" }}
+        </span>
+      </button>
+    </form>
+    {% endfor %}
+  </div>
+
+  {% if active_label %}
+  <div class="evolution-focus-grid">
+    <section class="evolution-focus-card">
+      <div class="panel-header-row">
+        <div>
+          <h3>{{ active_label.name }}</h3>
+          <p class="metric-subtle">Compact per-label view of the current best result and the recent candidate lineage.</p>
+        </div>
+      </div>
+
+      <div class="compact-evolution-metrics">
+        <div class="stat-chip evolution-setting-chip">
+          <span class="stat-label">candidates</span>
+          <strong class="stat-value stat-value-small">{{ active_label.candidate_count }}</strong>
+        </div>
+        <div class="stat-chip evolution-setting-chip">
+          <span class="stat-label">events</span>
+          <strong class="stat-value stat-value-small">{{ active_label.iteration_history|length }}</strong>
+        </div>
+        <div class="stat-chip evolution-setting-chip">
+          <span class="stat-label">iterations</span>
+          <strong class="stat-value stat-value-small">{{ active_summary.explored_iterations if active_summary else "—" }}</strong>
+        </div>
+        <div class="stat-chip evolution-setting-chip">
+          <span class="stat-label">best reward</span>
+          <strong class="stat-value stat-value-small">{{ "%.3f"|format(active_summary.best_score) if active_summary and active_summary.best_score is not none else "—" }}</strong>
+        </div>
+        <div class="stat-chip evolution-setting-chip">
+          <span class="stat-label">train</span>
+          <strong class="stat-value stat-value-small">{{ "%.3f"|format(active_summary.best_train_score) if active_summary and active_summary.best_train_score is not none else "—" }}</strong>
+        </div>
+        <div class="stat-chip evolution-setting-chip">
+          <span class="stat-label">validation</span>
+          <strong class="stat-value stat-value-small">{{ "%.3f"|format(active_summary.best_val_score) if active_summary and active_summary.best_val_score is not none else "—" }}</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="evolution-focus-card">
+      <div class="panel-header-row">
+        <div>
+          <h3>Best candidate</h3>
+          <p class="metric-subtle">The strongest saved candidate for this label. Open the candidate page for the full artifact view.</p>
+        </div>
+      </div>
+
+      {% if active_best %}
+      <div class="metric-stack compact-metric-stack">
+        <div class="metric-row"><span>Candidate</span><strong><a href="/runs/{{ evolution_run.env_id }}/{{ evolution_run.run_id }}/labels/{{ active_label.name }}/candidates/{{ active_best.name }}">{{ active_best.name }}</a></strong></div>
+        <div class="metric-row"><span>UID</span><strong>{{ active_best.uid or "—" }}</strong></div>
+        <div class="metric-row"><span>Reward</span><strong>{{ "%.3f"|format(active_best.average_score) if active_best.average_score is not none else "—" }}</strong></div>
+        <div class="metric-row"><span>Train reward</span><strong>{{ "%.3f"|format(active_best.train_score) if active_best.train_score is not none else "—" }}</strong></div>
+        <div class="metric-row"><span>Validation reward</span><strong>{{ "%.3f"|format(active_best.val_score) if active_best.val_score is not none else "—" }}</strong></div>
+        <div class="metric-row"><span>Origin</span><strong>{{ active_best.origin or "—" }}</strong></div>
+        {% if active_best.parent_uid or active_best.secondary_parent_uid %}
+        <div class="metric-row"><span>Diff</span><strong><a href="/runs/{{ evolution_run.env_id }}/{{ evolution_run.run_id }}/labels/{{ active_label.name }}/candidates/{{ active_best.name }}/diff">Open parent diff</a></strong></div>
+        {% endif %}
+        <div class="metric-row"><span>Iteration</span><strong>{{ active_best.iteration if active_best.iteration is not none else "—" }}</strong></div>
+        <div class="metric-row"><span>Errors</span><strong>{{ active_best.error_count }}</strong></div>
+      </div>
+      {% else %}
+      <p class="empty">No saved best candidate exists for this label yet.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="evolution-focus-card evolution-lineage-card">
+    <div class="panel-header-row">
+      <div>
+        <h3>Recent lineage</h3>
+        <p class="metric-subtle">Newest candidate transitions for {{ active_label.name }}, kept compact so you can scan changes quickly.</p>
+      </div>
+    </div>
+
+    {% if active_summary and active_summary.recent_lineage %}
+    <div class="scroll-table compact-scroll-table evolution-lineage-scroll">
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>Iter</th>
+            <th>Candidate</th>
+            <th>Origin</th>
+            <th>Parents</th>
+            <th>Reward</th>
+            <th>Validation</th>
+            <th>Diff</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for candidate in active_summary.recent_lineage %}
+          <tr>
+            <td>{{ candidate.iteration if candidate.iteration is not none else "—" }}</td>
+            <td>
+              {% if candidate.candidate_name %}
+              <a href="/runs/{{ evolution_run.env_id }}/{{ evolution_run.run_id }}/labels/{{ active_label.name }}/candidates/{{ candidate.candidate_name }}">{{ candidate.candidate_uid or candidate.candidate_name }}</a>
+              {% else %}
+              {{ candidate.candidate_uid or "candidate" }}
+              {% endif %}
+            </td>
+            <td>{{ candidate.origin or "seed" }}</td>
+            <td>
+              {% if candidate.parent_uid %}
+                {{ candidate.parent_uid }}
+                {% if candidate.secondary_parent_uid %}
+                  + {{ candidate.secondary_parent_uid }}
+                {% endif %}
+              {% else %}
+                seed
+              {% endif %}
+            </td>
+            <td>{{ "%.3f"|format(candidate.score) if candidate.score is not none else "—" }}</td>
+            <td>{{ "%.3f"|format(candidate.val_score) if candidate.val_score is not none else "—" }}</td>
+            <td>
+              {% if candidate.candidate_name and (candidate.parent_uid or candidate.secondary_parent_uid) %}
+              <a href="/runs/{{ evolution_run.env_id }}/{{ evolution_run.run_id }}/labels/{{ active_label.name }}/candidates/{{ candidate.candidate_name }}/diff">Diff</a>
+              {% else %}
+              —
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty">No lineage history has been recorded for this label yet.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+  {% else %}
+  <p class="empty">No label evolution data has been recorded yet.</p>
+  {% endif %}
+</section>

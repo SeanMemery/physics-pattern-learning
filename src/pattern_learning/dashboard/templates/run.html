@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ env_id }}">{{ env_id }}</a> / {{ run_id }}</p>
+  <h1>{{ env_id }} · {{ run_id }}</h1>
+  <p>Pattern run summary, evaluation history, and direct links to learned detector code.</p>
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <span class="stat-label">{{ "Score" if run else "State" }}</span>
+      <strong class="stat-value">
+        {% if run %}
+          {{ "%.3f"|format(run.average_score) if run.average_score is not none else "—" }}
+        {% elif run_job %}
+          {{ run_job.status }}
+        {% else %}
+          —
+        {% endif %}
+      </strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Labels</span>
+      <strong class="stat-value">{{ run.label_telemetry|length if run else "—" }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Candidates</span>
+      <strong class="stat-value">
+        {% set progress = run_job.learning_progress.progress_summary if run_job and run_job.learning_progress and run_job.learning_progress.progress_summary else None %}
+        {% if run %}
+          {% if run.candidate_count %}
+            {{ run.candidate_count }}
+          {% elif progress and progress.provisional_candidate_count %}
+            {{ progress.provisional_candidate_count }}
+          {% else %}
+            0
+          {% endif %}
+        {% else %}
+          —
+        {% endif %}
+      </strong>
+    </div>
+  </div>
+</section>
+
+<div class="button-row">
+  {% set run_status = run_job.status if run_job else (run.raw_run_payload.get("status") if run and run.raw_run_payload else None) %}
+  {% set can_resume = run_job and (run_job.metadata.get("supports_pause") or run_job.metadata.get("resume_argv")) %}
+  {% if not run_status and run %}
+    {% set run_status = "completed" %}
+  {% endif %}
+  {% set run_status_class = "succeeded" if run_status in ["completed", "succeeded"] else run_status %}
+  {% if run_status %}
+  <span class="pill status-{{ run_status_class }}" id="run-status-chip">{{ run_status }}</span>
+  {% endif %}
+  {% if run_job and run_job.metadata.get("supports_pause") and run_job.status in ["queued", "running"] %}
+  <form method="post" action="/jobs/{{ run_job.job_id }}/pause">
+    <input type="hidden" name="next" value="/runs/{{ env_id }}/{{ run_id }}">
+    <button class="secondary-button" type="submit">Pause run</button>
+  </form>
+  {% elif can_resume and run_job.status == "paused" %}
+  <form method="post" action="/jobs/{{ run_job.job_id }}/resume">
+    <input type="hidden" name="next" value="/runs/{{ env_id }}/{{ run_id }}">
+    <button class="secondary-button" type="submit">Unpause run</button>
+  </form>
+  {% endif %}
+  {% if run_job and run_job.metadata.get("queue_requested") and run_job.metadata.get("action") in ["supervised-learn-and-evaluate", "automatic-launch", "unsupervised-launch", "evaluate-deepphy"] and can_resume and run_job.status in ["running", "paused"] %}
+  <form method="post" action="/jobs/{{ run_job.job_id }}/requeue">
+    <input type="hidden" name="next" value="/runs/{{ env_id }}/{{ run_id }}">
+    <button class="secondary-button" type="submit">Requeue run</button>
+  </form>
+  {% endif %}
+  {% if run %}
+  <a class="secondary-button" href="/runs/{{ env_id }}/{{ run.run_id }}/evaluations">DeepPHY evaluations</a>
+  <a class="secondary-button" href="/runs/{{ env_id }}/{{ run.run_id }}/library-evaluations">Library holdout evals</a>
+  <form method="post" action="/runs/{{ env_id }}/{{ run.run_id }}/delete" onsubmit="return confirm('Delete supervised run {{ run.run_id }}? This removes the learned library, candidates, and evaluations.');">
+    <input type="hidden" name="next" value="/env/{{ env_id }}">
+    <button class="secondary-button danger-button" type="submit">Delete run</button>
+  </form>
+  {% endif %}
+</div>
+
+{% if not run %}
+<section class="panel">
+  <h2>Run pending</h2>
+  <p class="empty">This run has been launched, but its saved artifacts are not available yet.</p>
+</section>
+{% else %}
+{% set progress = run_job.learning_progress.progress_summary if run_job and run_job.learning_progress and run_job.learning_progress.progress_summary else None %}
+{% set provisional_labels_by_key = progress["provisional_labels_by_key"] if progress and "provisional_labels_by_key" in progress else {} %}
+{% set latest_evaluation = run.evaluation_runs[0] if run.evaluation_runs else None %}
+
+<section class="panel run-summary-panel">
+  <div class="panel-header-row">
+    <div>
+      <h2>Run summary</h2>
+      <p class="metric-subtle">Core run state, saved artifacts, and latest evaluation status in one place.</p>
+    </div>
+  </div>
+  <div class="run-summary-grid">
+    <article class="run-summary-card">
+      <span class="run-summary-label">Average reward</span>
+      <strong class="run-summary-value">{{ "%.3f"|format(run.average_score) if run.average_score is not none else "—" }}</strong>
+      <p class="run-summary-meta">
+        Train {{ "%.3f"|format(run.mean_train_score) if run.mean_train_score is not none else "—" }}
+        · Validation {{ "%.3f"|format(run.mean_validation_score) if run.mean_validation_score is not none else "—" }}
+      </p>
+    </article>
+    <article class="run-summary-card">
+      <span class="run-summary-label">Coverage</span>
+      <strong class="run-summary-value">{{ run.label_telemetry|length }} labels</strong>
+      <p class="run-summary-meta">
+        {{ run.candidate_count if run.candidate_count else (progress.provisional_candidate_count if progress and progress.provisional_candidate_count else 0) }} candidates
+        · {{ run.detector_count if run.detector_count is not none else "—" }} detectors
+      </p>
+    </article>
+    <article class="run-summary-card">
+      <span class="run-summary-label">Samples</span>
+      <strong class="run-summary-value">{{ run.sample_count if run.sample_count is not none else "—" }}</strong>
+      <p class="run-summary-meta">
+        Train {{ run.train_sample_count if run.train_sample_count is not none else "—" }}
+        · Validation {{ run.validation_sample_count if run.validation_sample_count is not none else "—" }}
+      </p>
+    </article>
+    <article class="run-summary-card">
+      <span class="run-summary-label">Latest DeepPHY eval</span>
+      <strong class="run-summary-value">
+        {% if latest_evaluation and latest_evaluation.success_ratio is not none %}
+          {{ "%.1f%%"|format(latest_evaluation.success_ratio * 100) }}
+        {% elif latest_evaluation %}
+          {{ latest_evaluation.status }}
+        {% else %}
+          Missing
+        {% endif %}
+      </strong>
+      <p class="run-summary-meta">
+        {% if latest_evaluation %}
+          {{ latest_evaluation.run_id }} · {{ latest_evaluation.success_count if latest_evaluation.success_count is not none else 0 }}/{{ latest_evaluation.task_count }}
+        {% else %}
+          No saved evaluation yet
+        {% endif %}
+      </p>
+    </article>
+  </div>
+</section>
+
+{% if evaluation_scores_by_model %}
+<section class="panel">
+  <div class="panel-header-row">
+    <div>
+      <h2>Eval scores by LM</h2>
+      <p class="metric-subtle">Saved DeepPHY performance for this learned library, grouped by router model name.</p>
+    </div>
+  </div>
+  <div class="scroll-table compact-scroll-table">
+    <table class="data-table compact-table">
+      <thead>
+        <tr>
+          <th>LM</th>
+          <th>Best</th>
+          <th>Latest</th>
+          <th>Evals</th>
+          <th>Best run</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in evaluation_scores_by_model %}
+        <tr>
+          <td class="truncate">{{ row.display_model }}</td>
+          <td>
+            {% if row.best_success_ratio is not none %}
+              {{ "%.1f%%"|format(row.best_success_ratio * 100) }}
+              {% if row.best_success_count is not none and row.best_task_count is not none %}
+                · {{ row.best_success_count }}/{{ row.best_task_count }}
+              {% endif %}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
+            {% if row.latest_success_ratio is not none %}
+              {{ "%.1f%%"|format(row.latest_success_ratio * 100) }}
+              {% if row.latest_success_count is not none and row.latest_task_count is not none %}
+                · {{ row.latest_success_count }}/{{ row.latest_task_count }}
+              {% endif %}
+            {% else %}
+              {{ row.latest_status or "—" }}
+            {% endif %}
+          </td>
+          <td>{{ row.evaluation_count }}</td>
+          <td>
+            {% if row.best_run_id %}
+            <a href="/runs/{{ env_id }}/{{ run.run_id }}/evaluations/{{ row.best_run_id }}">{{ row.best_run_id }}</a>
+            {% else %}
+            —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="run-top-grid">
+  <div class="run-top-main">
+    {% if run_job %}
+      {% include "_run_job_panel.html" %}
+    {% endif %}
+    {% if run and run.label_telemetry %}
+      {% with evolution_run=run %}
+        {% include "_library_reward_overview.html" %}
+      {% endwith %}
+    {% endif %}
+  </div>
+
+  <aside class="run-top-side run-side-stack">
+    {% if run and not run.evaluation_runs %}
+    <section class="panel warning-panel compact-warning-panel">
+      <div class="panel-header-row">
+        <div>
+          <h2>DeepPHY evaluation missing</h2>
+          <p class="metric-subtle">This supervised run has no saved DeepPHY evaluation yet.</p>
+        </div>
+      </div>
+      <a class="primary-button" href="/runs/{{ env_id }}/{{ run.run_id }}/evaluations">Evaluate now</a>
+      <a class="secondary-button" href="/runs/{{ env_id }}/{{ run.run_id }}/library-evaluations">Holdout evals</a>
+    </section>
+    {% endif %}
+
+    {% include "_timing_breakdown.html" %}
+
+    {% with llm_call_base_url='/runs/' ~ env_id ~ '/' ~ run.run_id ~ '/llm-calls' %}
+      {% include "_llm_calls_panel.html" %}
+    {% endwith %}
+  </aside>
+</section>
+
+{% if run and run.label_telemetry %}
+  {% with evolution_run=run, evolution_settings=learning_settings, evolution_run_url=None, selected_evolution_label=selected_evolution_label, evolution_base_url='/runs/' ~ env_id ~ '/' ~ run.run_id, evolution_query_prefix=('?job=' ~ run_job.job_id ~ '&') if run_job else '?' %}
+    {% include "_evolution_panel.html" %}
+  {% endwith %}
+{% endif %}
+
+<section class="panel compact-panel">
+  <label class="metric-subtle run-advanced-toggle" for="run-advanced-sections-toggle">
+    <input id="run-advanced-sections-toggle" type="checkbox">
+    Show detailed tables below Evolution view
+  </label>
+</section>
+
+<div id="run-advanced-sections" hidden>
+<section class="workspace-grid run-secondary-grid">
+<section class="panel">
+  <div class="panel-header-row">
+    <div>
+      <h2>Best candidates</h2>
+      <p class="metric-subtle">Best saved candidate per label, with reward and quick links into candidate details.</p>
+    </div>
+  </div>
+  {% if run.best_candidates %}
+  <div class="scroll-table compact-scroll-table">
+  <table class="data-table compact-table">
+    <thead>
+      <tr>
+        <th>Label</th>
+        <th>Candidate</th>
+        <th>Average reward</th>
+        <th>Train</th>
+        <th>Validation</th>
+        <th>Reward summary</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for label in run.label_telemetry %}
+      {% if label.best_candidate %}
+      <tr>
+        <td>{{ label.name }}</td>
+        <td><a href="/runs/{{ env_id }}/{{ run.run_id }}/labels/{{ label.name }}/candidates/{{ label.best_candidate.name }}">{{ label.best_candidate.name }}</a></td>
+        <td>{{ "%.3f"|format(label.best_candidate.average_score) if label.best_candidate.average_score is not none else "—" }}</td>
+        <td>{{ "%.3f"|format(label.best_candidate.train_score) if label.best_candidate.train_score is not none else "—" }}</td>
+        <td>{{ "%.3f"|format(label.best_candidate.val_score) if label.best_candidate.val_score is not none else "—" }}</td>
+        <td>
+          {% if label.loss_breakdown %}
+            {% for item in label.loss_breakdown %}
+              <div>{{ item.kind or "reward" }}: {{ "%.3f"|format(item.weighted_score) if item.weighted_score is not none else "—" }}</div>
+            {% endfor %}
+          {% elif label.best_candidate.loss_breakdown %}
+            {% for item in label.best_candidate.loss_breakdown %}
+              <div>{{ item.kind or "reward" }}: {{ "%.3f"|format(item.weighted_score) if item.weighted_score is not none else "—" }}</div>
+            {% endfor %}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% elif progress and progress.provisional_labels %}
+  <p class="metric-subtle">Derived from live job output while candidate artifacts are still being written.</p>
+  <div class="scroll-table compact-scroll-table">
+  <table class="data-table compact-table">
+    <thead>
+      <tr>
+        <th>Label</th>
+        <th>Evaluations</th>
+        <th>Best reward</th>
+        <th>Validation reward</th>
+        <th>Fingerprint</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for label in progress.provisional_labels %}
+      <tr>
+        <td>{{ label.label }}</td>
+        <td>{{ label.candidate_evaluations }}</td>
+        <td>{{ "%.3f"|format(label.best_score) if label.best_score is not none else "—" }}</td>
+        <td>{{ "%.3f"|format(label.best_validation_score) if label.best_validation_score is not none else "—" }}</td>
+        <td>{{ label.best_fingerprint or "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">No best candidate metadata was found.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Labels</h2>
+  <p class="metric-subtle">Open a label for candidate telemetry, detailed search reward history, and evolution events.</p>
+  {% if run.label_telemetry %}
+    {% for label in run.label_telemetry %}
+    {% set provisional_label = provisional_labels_by_key.get(label.name) %}
+    <a class="metric-row compact-row label-link-row" href="/runs/{{ env_id }}/{{ run.run_id }}/labels/{{ label.name }}">
+      <div class="metric-main">
+        <div class="metric-title">{{ label.name }}</div>
+        <div class="metric-subtle split-summary-line">
+          Best reward: {{ "%.3f"|format(label.best_candidate.average_score) if label.best_candidate and label.best_candidate.average_score is not none else ("%.3f"|format(provisional_label.best_score) if provisional_label and provisional_label.best_score is not none else "—") }}
+          · Validation: {{ "%.3f"|format(label.best_candidate.val_score) if label.best_candidate and label.best_candidate.val_score is not none else ("%.3f"|format(provisional_label.best_validation_score) if provisional_label and provisional_label.best_validation_score is not none else "—") }}
+        </div>
+      </div>
+      <div class="job-inline-actions">
+        <span class="pill">{{ label.candidate_count if label.candidate_count else (provisional_label.candidate_evaluations if provisional_label else 0) }} candidates</span>
+      </div>
+    </a>
+    {% endfor %}
+  {% else %}
+    <p class="empty">No labels were recorded for this run.</p>
+  {% endif %}
+</section>
+</section>
+
+<section class="panel">
+  <h2>Evolution history</h2>
+  {% if run.evolution_history %}
+  <div class="scroll-table compact-scroll-table">
+  <table class="data-table compact-table">
+    <thead>
+      <tr>
+        <th>Label</th>
+        <th>Iteration</th>
+        <th>Candidate UID</th>
+        <th>Origin</th>
+        <th>Reward</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for event in run.evolution_history %}
+      <tr>
+        <td>{{ event.label_name }}</td>
+        <td>{{ event.iteration if event.iteration is not none else "—" }}</td>
+        <td>
+          {% if event.candidate_name %}
+          <a href="/runs/{{ env_id }}/{{ run.run_id }}/labels/{{ event.label_name }}/candidates/{{ event.candidate_name }}">{{ event.candidate_uid or event.candidate_name }}</a>
+          {% else %}
+          {{ event.candidate_uid or "—" }}
+          {% endif %}
+        </td>
+        <td>{{ event.origin or "—" }}</td>
+        <td>{{ "%.3f"|format(event.score) if event.score is not none else "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% elif progress and progress.provisional_events %}
+    <p class="metric-subtle">Derived from recent live job output while evolution artifacts are still unavailable.</p>
+    <div class="scroll-table compact-scroll-table">
+    <table class="data-table compact-table">
+      <thead>
+        <tr>
+          <th>Label</th>
+          <th>Eval</th>
+          <th>Fingerprint</th>
+          <th>Reward</th>
+          <th>Validation reward</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in progress.provisional_events %}
+        <tr>
+          <td>{{ event.label }}</td>
+          <td>{{ event.evaluation_index if event.evaluation_index is not none else "—" }}</td>
+          <td>{{ event.candidate_fingerprint or "—" }}</td>
+          <td>{{ "%.3f"|format(event.score) if event.score is not none else "—" }}</td>
+          <td>{{ "%.3f"|format(event.validation_score) if event.validation_score is not none else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  {% else %}
+    <p class="empty">No evolution history file found.</p>
+  {% endif %}
+</section>
+</div>
+{% endif %}
+<script>
+  (() => {
+    const toggle = document.getElementById("run-advanced-sections-toggle");
+    const sections = document.getElementById("run-advanced-sections");
+    if (!toggle || !sections) {
+      return;
+    }
+
+    function syncVisibility() {
+      sections.hidden = !toggle.checked;
+    }
+
+    toggle.addEventListener("change", syncVisibility);
+    syncVisibility();
+  })();
+</script>
+{% include "_reward_chart_script.html" %}
+{% endblock %}

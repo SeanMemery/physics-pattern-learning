@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ env_id }}">{{ env_id }}</a> / <a href="/runs/{{ env_id }}/{{ run_id }}">{{ run_id }}</a> / <a href="/runs/{{ env_id }}/{{ run_id }}/evaluations">evaluations</a> / {{ selected_evaluation.run_id }}</p>
+  <h1>{{ env_id }} · {{ run_id }} · {{ selected_evaluation.run_id }}</h1>
+  <p>Detailed DeepPHY evaluation results for one saved evaluation run.</p>
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <span class="stat-label">Status</span>
+      <strong class="stat-value"><span class="pill status-{{ evaluation_status if evaluation_status != 'completed' else 'succeeded' }}" id="evaluation-status-chip">{{ evaluation_status }}</span></strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Success</span>
+      <strong class="stat-value">
+        {% if selected_evaluation.success_ratio is not none %}
+          {{ "%.1f%%"|format(selected_evaluation.success_ratio * 100) }}
+        {% else %}
+          {{ selected_evaluation.success_count }}/{{ selected_evaluation.task_count }}
+        {% endif %}
+      </strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Tasks</span>
+      <strong class="stat-value">{{ selected_evaluation.task_count }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Elapsed</span>
+      <strong class="stat-value">{{ format_duration(selected_evaluation.total_duration_seconds) }}</strong>
+    </div>
+  </div>
+</section>
+
+<div class="button-row">
+  <a class="secondary-button" href="/runs/{{ env_id }}/{{ run_id }}/evaluations">Back to evaluations</a>
+  <a class="secondary-button" href="/runs/{{ env_id }}/{{ run_id }}">Back to run</a>
+  <form method="post" action="/runs/{{ env_id }}/{{ run_id }}/evaluations/{{ selected_evaluation.run_id }}/delete" onsubmit="return confirm('Delete evaluation {{ selected_evaluation.run_id }}?');">
+    <input type="hidden" name="next" value="/runs/{{ env_id }}/{{ run_id }}/evaluations">
+    <button class="secondary-button danger-button" type="submit">Delete evaluation</button>
+  </form>
+</div>
+
+{% if evaluation_job %}
+  {% include "_evaluation_job_panel.html" %}
+{% endif %}
+
+<section class="content-grid">
+  <section class="panel">
+    <h2>Summary</h2>
+    <div class="chip-row evolution-settings compact-summary-chips">
+      <div class="stat-chip evolution-setting-chip">
+        <span class="stat-label">run</span>
+        <strong class="stat-value stat-value-small">{{ selected_evaluation.run_id }}</strong>
+      </div>
+      <div class="stat-chip evolution-setting-chip">
+        <span class="stat-label">status</span>
+        <strong class="stat-value stat-value-small">{{ selected_evaluation.status }}</strong>
+      </div>
+      <div class="stat-chip evolution-setting-chip">
+        <span class="stat-label">success</span>
+        <strong class="stat-value stat-value-small">
+          {% if selected_evaluation.success_ratio is not none %}
+            {{ "%.1f%%"|format(selected_evaluation.success_ratio * 100) }}
+          {% else %}
+            {{ selected_evaluation.success_count }}/{{ selected_evaluation.task_count }}
+          {% endif %}
+        </strong>
+      </div>
+      <div class="stat-chip evolution-setting-chip">
+        <span class="stat-label">tasks</span>
+        <strong class="stat-value stat-value-small">{{ selected_evaluation.task_count }}</strong>
+      </div>
+      <div class="stat-chip evolution-setting-chip">
+        <span class="stat-label">labels used</span>
+        <strong class="stat-value stat-value-small">{{ selected_evaluation.label_selection.enabled_count }}</strong>
+      </div>
+      <div class="stat-chip evolution-setting-chip">
+        <span class="stat-label">elapsed</span>
+        <strong class="stat-value stat-value-small">{{ format_duration(selected_evaluation.total_duration_seconds) }}</strong>
+      </div>
+      <div class="stat-chip evolution-setting-chip">
+        <span class="stat-label">avg/task</span>
+        <strong class="stat-value stat-value-small">{{ format_duration(selected_evaluation.average_task_duration_seconds) }}</strong>
+      </div>
+    </div>
+    <div class="compact-metric-list">
+      <div class="metric-row compact-metric-row"><span>Model</span><strong>{{ selected_evaluation.model_name or "—" }}</strong></div>
+      <div class="metric-row compact-metric-row"><span>Prompt format</span><strong>{{ selected_evaluation.prompt_format or "—" }}</strong></div>
+      <div class="metric-row compact-metric-row"><span>Description mode</span><strong>{{ selected_evaluation.description_mode or "—" }}</strong></div>
+      <div class="metric-row compact-metric-row"><span>Selection source</span><strong>{{ selected_evaluation.label_selection.source or "—" }}</strong></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Labels used</h2>
+    <div class="evaluation-label-breakdown">
+      <div>
+        <span class="section-label">Enabled</span>
+        <div class="evaluation-inline-list">
+          {% for label in selected_evaluation.label_selection.enabled_labels %}
+            <span class="mini-chip">{{ label }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% if selected_evaluation.label_selection.disabled_labels %}
+      <div>
+        <span class="section-label">Disabled</span>
+        <div class="evaluation-inline-list">
+          {% for label in selected_evaluation.label_selection.disabled_labels %}
+            <span class="mini-chip mini-chip-off">{{ label }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+</section>
+
+<section class="content-grid">
+  <section class="panel">
+    <h2>Performance values</h2>
+    {% if selected_evaluation.metric_summaries %}
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Mean</th>
+            <th>Min</th>
+            <th>Max</th>
+            <th>Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for metric in selected_evaluation.metric_summaries %}
+          <tr>
+            <td>{{ metric.name }}</td>
+            <td>{{ "%.4f"|format(metric.mean) if metric.mean is not none else "—" }}</td>
+            <td>{{ "%.4f"|format(metric.minimum) if metric.minimum is not none else "—" }}</td>
+            <td>{{ "%.4f"|format(metric.maximum) if metric.maximum is not none else "—" }}</td>
+            <td>{{ metric.count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">No numeric performance values were recorded for this evaluation.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h2>Terminal statuses</h2>
+    {% if selected_evaluation.terminal_status_counts %}
+      <div class="evaluation-inline-list">
+        {% for status, count in selected_evaluation.terminal_status_counts.items() %}
+          <span class="mini-chip">{{ status }} · {{ count }}</span>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty">No terminal statuses were recorded for this evaluation.</p>
+    {% endif %}
+  </section>
+</section>
+
+<section class="panel">
+  <h2>Task breakdown</h2>
+  {% if selected_evaluation.task_summaries %}
+    <div class="scroll-table compact-scroll-table">
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>Task</th>
+            <th>Outcome</th>
+            <th>Terminal status</th>
+            <th>Records</th>
+            <th>Time</th>
+            <th>Timestamp</th>
+            <th>Metrics</th>
+            <th>Media</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for task in selected_evaluation.task_summaries %}
+          <tr>
+            <td>
+              {% if task.task_id %}
+                <a href="/runs/{{ env_id }}/{{ run_id }}/evaluations/{{ selected_evaluation.run_id }}/tasks/{{ task.task_token or task.task_id }}">{{ task.task_id }}</a>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>
+              {% if task.success is sameas true %}
+                <span class="mini-chip">success</span>
+              {% elif task.success is sameas false %}
+                <span class="mini-chip mini-chip-off">failure</span>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>{{ task.terminal_status or "—" }}</td>
+            <td>{{ task.record_count }}</td>
+            <td>{{ format_duration(task.total_duration_seconds) }}</td>
+            <td>{{ task.completed_at|display_time }}</td>
+            <td>
+              <div class="evaluation-inline-list">
+                {% for name, value in task.native_metrics.items() %}
+                  {% if loop.index <= 3 %}
+                    <span class="mini-chip">{{ name }} {{ value }}</span>
+                  {% endif %}
+                {% endfor %}
+                {% if task.native_metrics|length > 3 %}
+                  <span class="mini-chip">+{{ task.native_metrics|length - 3 }}</span>
+                {% elif not task.native_metrics %}
+                  <span class="metric-subtle">—</span>
+                {% endif %}
+              </div>
+            </td>
+            <td>
+              <div class="evaluation-inline-list">
+                {% if task.initial_scene_path and task.task_token %}
+                  <a class="mini-chip" href="/runs/{{ env_id }}/{{ run_id }}/evaluations/{{ selected_evaluation.run_id }}/tasks/{{ task.task_token }}/media/initial_scene.png">scene</a>
+                {% endif %}
+                {% if task.simulation_path and task.task_token %}
+                  <a class="mini-chip" href="/runs/{{ env_id }}/{{ run_id }}/evaluations/{{ selected_evaluation.run_id }}/tasks/{{ task.task_token }}/media/simulation.mp4">video</a>
+                {% endif %}
+                {% if not task.initial_scene_path and not task.simulation_path %}
+                  <span class="metric-subtle">—</span>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">No per-task results were saved for this evaluation.</p>
+  {% endif %}
+</section>
+{% endblock %}

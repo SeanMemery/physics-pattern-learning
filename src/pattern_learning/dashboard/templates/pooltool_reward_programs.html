@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / PoolTool reward programs</p>
+  <h1>PoolTool reward programs</h1>
+  <p>Use a learned PoolTool library as the symbolic vocabulary, then either synthesize a DSL reward from a natural-language goal or provide the DSL directly. The page supports the two paper-style experiments: simulated-annealing optimization with dense reward vs binary reward, and value-model training from reward-program labels.</p>
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <span class="stat-label">Source libraries</span>
+      <strong class="stat-value">{{ source_options|length }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Optimization runs</span>
+      <strong class="stat-value">{{ optimization_runs|length }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Value-model runs</span>
+      <strong class="stat-value">{{ value_model_runs|length }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Active local runs</span>
+      <strong class="stat-value">{{ active_reward_runs|length }}</strong>
+    </div>
+  </div>
+</section>
+
+<section class="content-grid">
+  <section class="panel">
+    <h2>Optimization experiment</h2>
+    <p class="metric-subtle">Random PoolTool scenes, synthesized dense reward program, and a binary-reward baseline under the same simulated-annealing budgets.</p>
+    {% if optimization_error %}
+      <p class="form-error">{{ optimization_error }}</p>
+    {% endif %}
+    <form class="launch-form" method="post" action="/pooltool/reward-programs/optimization/launch">
+      <div class="form-grid compact-form-grid">
+        <label>
+          <span>Source library</span>
+          <select name="source_run_dir" {% if not source_options %}disabled{% endif %}>
+            {% if not source_options %}
+              <option value="" selected>No PoolTool libraries available</option>
+            {% endif %}
+            {% for option in source_options %}
+              <option value="{{ option.value }}" {% if optimization_values.source_run_dir == option.value %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span>LM name</span>
+          <input type="text" name="model" value="{{ optimization_values.model or '' }}" placeholder="blank string default">
+        </label>
+        <label>
+          <span>Scenes</span>
+          <input type="number" min="1" name="scene_count" value="{{ optimization_values.scene_count or '10' }}">
+        </label>
+        <label>
+          <span>Seeds</span>
+          <input type="number" min="1" name="seed_count" value="{{ optimization_values.seed_count or '5' }}">
+        </label>
+        <label>
+          <span>Budgets</span>
+          <input type="text" name="budgets" value="{{ optimization_values.budgets or '10,50,100,250,500,1000' }}" placeholder="10,50,100,250,500,1000">
+        </label>
+        <label>
+          <span>Rack jitter</span>
+          <input type="number" min="0" step="0.01" name="rack_jitter" value="{{ optimization_values.rack_jitter or '0.12' }}">
+        </label>
+        <label class="full-width-field">
+          <span>Natural-language goal</span>
+          <textarea class="form-textarea" name="goal_text" rows="3" placeholder="Pot the 9 ball after nudging the 1 ball clear of the pocket lane.">{{ optimization_values.goal_text or '' }}</textarea>
+        </label>
+        <label class="full-width-field">
+          <span>DSL program</span>
+          <textarea class="form-textarea" name="dsl_program" rows="6" placeholder="If you leave this blank, the LM synthesizes the reward DSL from the goal.">{{ optimization_values.dsl_program or '' }}</textarea>
+        </label>
+        <label>
+          <span>Run id</span>
+          <input type="text" name="run_id" value="{{ optimization_values.run_id or '' }}" placeholder="optional">
+        </label>
+      </div>
+      <p class="metric-subtle">Provide either a goal, a DSL program, or both. If both are present, the provided DSL is used directly and the goal is still saved with the experiment.</p>
+      <div class="button-row launch-button-row">
+        <button class="primary-button" type="submit">Launch local optimization run</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Value-model experiment</h2>
+    <p class="metric-subtle">Generate reward labels from the DSL program, train an action-conditioned value model, then evaluate how well the chosen actions satisfy the reward on held-out random scenes.</p>
+    {% if value_model_error %}
+      <p class="form-error">{{ value_model_error }}</p>
+    {% endif %}
+    <form class="launch-form" method="post" action="/pooltool/reward-programs/value-model/launch">
+      <div class="form-grid compact-form-grid">
+        <label>
+          <span>Source library</span>
+          <select name="source_run_dir" {% if not source_options %}disabled{% endif %}>
+            {% if not source_options %}
+              <option value="" selected>No PoolTool libraries available</option>
+            {% endif %}
+            {% for option in source_options %}
+              <option value="{{ option.value }}" {% if value_model_values.source_run_dir == option.value %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span>LM name</span>
+          <input type="text" name="model" value="{{ value_model_values.model or '' }}" placeholder="blank string default">
+        </label>
+        <label>
+          <span>Train scenes</span>
+          <input type="number" min="1" name="train_scene_count" value="{{ value_model_values.train_scene_count or '64' }}">
+        </label>
+        <label>
+          <span>Actions / train scene</span>
+          <input type="number" min="1" name="train_actions_per_scene" value="{{ value_model_values.train_actions_per_scene or '32' }}">
+        </label>
+        <label>
+          <span>Validation scenes</span>
+          <input type="number" min="1" name="validation_scene_count" value="{{ value_model_values.validation_scene_count or '12' }}">
+        </label>
+        <label>
+          <span>Candidates / val scene</span>
+          <input type="number" min="1" name="validation_candidates_per_scene" value="{{ value_model_values.validation_candidates_per_scene or '128' }}">
+        </label>
+        <label>
+          <span>Epochs</span>
+          <input type="number" min="1" name="epochs" value="{{ value_model_values.epochs or '50' }}">
+        </label>
+        <label>
+          <span>Batch size</span>
+          <input type="number" min="1" name="batch_size" value="{{ value_model_values.batch_size or '64' }}">
+        </label>
+        <label>
+          <span>Learning rate</span>
+          <input type="number" min="0" step="0.0001" name="learning_rate" value="{{ value_model_values.learning_rate or '0.001' }}">
+        </label>
+        <label>
+          <span>Image size</span>
+          <input type="number" min="32" step="32" name="image_size" value="{{ value_model_values.image_size or '256' }}">
+        </label>
+        <label>
+          <span>Rack jitter</span>
+          <input type="number" min="0" step="0.01" name="rack_jitter" value="{{ value_model_values.rack_jitter or '0.12' }}">
+        </label>
+        <label>
+          <span>Run id</span>
+          <input type="text" name="run_id" value="{{ value_model_values.run_id or '' }}" placeholder="optional">
+        </label>
+        <label class="full-width-field">
+          <span>Natural-language goal</span>
+          <textarea class="form-textarea" name="goal_text" rows="3" placeholder="Pot the 9 ball while keeping the cue ball on the table.">{{ value_model_values.goal_text or '' }}</textarea>
+        </label>
+        <label class="full-width-field">
+          <span>DSL program</span>
+          <textarea class="form-textarea" name="dsl_program" rows="6" placeholder="If blank, the LM synthesizes the reward DSL from the goal.">{{ value_model_values.dsl_program or '' }}</textarea>
+        </label>
+      </div>
+      <div class="button-row launch-button-row">
+        <button class="primary-button" type="submit">Launch local value-model run</button>
+      </div>
+    </form>
+  </section>
+</section>
+
+<section class="panel">
+  <h2>Recent local reward runs</h2>
+  {% if reward_runs %}
+    <div class="scroll-table compact-scroll-table">
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Source</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for run in reward_runs %}
+          <tr>
+            <td><a href="{{ reward_run_url(run) }}">{{ run.run_id }}</a></td>
+            <td>{{ "optimization" if run.kind == "optimization" else "value-model" }}</td>
+            <td><span class="pill status-{{ run.status }}">{{ run.status }}</span></td>
+            <td>{{ run.source_run_dir | replace("/home/sean/Nextcloud/PhD/Year_4/pattern-learning-v2/data/patterns/pooltool/", "") }}</td>
+            <td>{{ display_time(run.updated_at or run.started_at) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">No local reward runs launched yet.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Saved optimization experiments</h2>
+  {% if optimization_runs %}
+    <div class="scroll-table compact-scroll-table">
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th>Goal</th>
+            <th>Source</th>
+            <th>LM</th>
+            <th>Synth</th>
+            <th>Dense @ max</th>
+            <th>Binary @ max</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for run in optimization_runs %}
+            {% set dense_rows = run.budget_summaries | selectattr("reward_kind", "equalto", "dense") | list %}
+            {% set binary_rows = run.budget_summaries | selectattr("reward_kind", "equalto", "binary") | list %}
+            {% set dense_last = dense_rows[-1] if dense_rows else none %}
+            {% set binary_last = binary_rows[-1] if binary_rows else none %}
+            <tr>
+              <td><a href="/pooltool/reward-programs/optimization/{{ run.run_id }}">{{ run.run_id }}</a></td>
+              <td class="truncate">{{ run.goal_text or "DSL only" }}</td>
+              <td>{{ run.source_run_id }}{% if run.source_run_kind %} · {{ run.source_run_kind }}{% endif %}</td>
+              <td class="truncate">{{ run.model_name or "(router default)" }}</td>
+              <td>{{ "yes" if run.synthesized else "no" }}</td>
+              <td>
+                {% if dense_last %}
+                  {{ "%.1f%%"|format(dense_last.success_rate * 100) }} · {{ "%.3f"|format(dense_last.mean_reward) }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>
+                {% if binary_last %}
+                  {{ "%.1f%%"|format(binary_last.success_rate * 100) }} · {{ "%.3f"|format(binary_last.mean_reward) }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">No saved optimization experiments yet.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Saved value-model experiments</h2>
+  {% if value_model_runs %}
+    <div class="scroll-table compact-scroll-table">
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th>Goal</th>
+            <th>Source</th>
+            <th>LM</th>
+            <th>Synth</th>
+            <th>Best val reward</th>
+            <th>Best val success</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for run in value_model_runs %}
+          <tr>
+            <td><a href="/pooltool/reward-programs/value-model/{{ run.run_id }}">{{ run.run_id }}</a></td>
+            <td class="truncate">{{ run.goal_text or "DSL only" }}</td>
+            <td>{{ run.source_run_id }}{% if run.source_run_kind %} · {{ run.source_run_kind }}{% endif %}</td>
+            <td class="truncate">{{ run.model_name or "(router default)" }}</td>
+            <td>{{ "yes" if run.synthesized else "no" }}</td>
+            <td>{{ "%.3f"|format(run.best_validation_mean_reward) }}</td>
+            <td>{{ "%.1f%%"|format(run.best_validation_success_rate * 100) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">No saved value-model experiments yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

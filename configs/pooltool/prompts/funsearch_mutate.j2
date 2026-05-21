@@ -1,0 +1,75 @@
+You are writing a Python detector for the {{ environment_id|upper }} environment.
+Target primitive label: {{ label }}
+Search step: {{ step }}
+
+Write Python code only. Define exactly one function:
+
+def find_pattern(trace):
+    ...
+
+Rules:
+- no imports
+- inspect only the provided `trace` dict
+- return a list of pattern dicts
+- each pattern dict must contain `label`, `start_timestep`, `end_timestep`, and `parameters`
+- use inclusive timestep spans; if the pattern is effectively instantaneous, set `start_timestep == end_timestep`
+- choose the narrowest specific timestep span supported by the evidence; do not default to the full trace unless the pattern truly persists for the entire trace
+- `parameters` must include an `object_details` dict keyed by object id or role, with each entry describing the object's role in the pattern, ball identity/kind, and where the pattern starts/ends for that object
+- include object-location details directly in `parameters` when you can infer them from the trace; do not leave the pattern undescribed if object participation is visible
+- optional fields are `provenance` and `metadata`
+- use the exact target label `{{ label }}`
+- if the pattern is absent, return []
+
+Pooltool trace structure:
+- `trace["timesteps"]` is the main kinematic signal
+- timestep objects are usually billiard balls with `kind`, `ball_id`, `position`, `velocity`, `angular_velocity`, `motion_state_code`, `motion_state`, `t`, `radius`
+- `position`, `velocity`, and `angular_velocity` are 3D vectors, but table motion is mostly in the x-y plane
+- `trace["events"]` is especially informative here; it often contains event kinds such as `physics_ball_ball`, `physics_ball_linear_cushion`, `physics_stick_ball`, `physics_sliding_rolling`, `physics_rolling_stationary`, `shot_prepared`, and `shot_outcome`
+- `trace["outcome"]` contains shot-level success and terminal status like potted/no-ball outcomes
+
+How to write good Pooltool detectors:
+- use `events` for discrete contact/transition patterns such as collision, rolling transfer, or cue strike
+- use `timesteps` when you need sustained motion, support, containment-like geometry, or ball trajectories
+- identify balls by `ball_id`, not by list position
+- for geometric checks, usually ignore the z coordinate and reason in x-y
+- motion-state transitions are often easier to detect than raw acceleration thresholds
+- emit inclusive timestep ranges, not a single representative time
+- pick concrete start/end timesteps where the pattern is actually visible, not just the earliest and latest timestep in the trace
+
+Compact trace example:
+```python
+{
+  "environment": "pooltool",
+  "task_id": "str",
+  "timesteps": [
+    {
+      "index": int,
+      "t": float,
+      "objects": [
+        {
+          "kind": "ball",
+          "ball_id": "str",
+          "position": [float, float, float],
+          "velocity": [float, float, float],
+          "angular_velocity": [float, float, float],
+          "motion_state_code": int,
+          "motion_state": "str",
+          "radius": float
+        }
+      ]
+    }
+  ],
+  "events": [{"kind": "physics_ball_ball", "t": float, "payload": {...}}],
+  "outcome": {"success": bool, "terminal_status": "str", "metrics": {...}}
+}
+```
+
+Your objective is to maximize the training reward.
+Learn from this example what works, keep the strong ideas, remove weak or brittle logic, and produce a better detector.
+
+Improve this parent candidate:
+```python
+{{ parent_code }}
+```
+
+Parent candidate training reward to maximize: {{ parent_metadata.average_score }}

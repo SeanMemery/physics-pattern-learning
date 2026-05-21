@@ -1,0 +1,16 @@
+config_version: "1"
+dataset_name: "pattern_learning_small_kinetix"
+env_ids:
+  - kinetix
+splits:
+  - name: train
+    sample_count: 3
+    sample_offset: 0
+  - name: validation
+    sample_count: 1
+    sample_offset: 500000
+  - name: test
+    sample_count: 1
+    sample_offset: 1000000
+notes:
+  - "Small Kinetix dataset for end-to-end pattern-learning validation."

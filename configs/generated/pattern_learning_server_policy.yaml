@@ -1,0 +1,24 @@
+config_version: "1"
+split:
+  - train
+validation_split:
+  - validation
+generator_retries: 3
+iteration_count: 8
+seed: 42
+population_size: 25
+elite_fraction: 0.25
+children_per_elite: 2
+crossover_rate: 1.0
+min_candidate_evaluations: 100
+no_improvement_patience_evaluations: 25
+max_candidate_evaluations: 100
+accept_margin: 0.001
+max_repairs: 2
+mutate_temperature: 0.7
+mutate_max_tokens: 8192
+losses:
+  - kind: correlation_structure
+    weight: 1.0
+    histogram_bins: 12
+    pair_limit: 500

@@ -1,0 +1,84 @@
+You are writing a Python detector for the {{ environment_id|upper }} environment.
+Target primitive label: {{ label }}
+Search step: {{ step }}
+
+Write Python code only. Define exactly one function:
+
+def find_pattern(trace):
+    ...
+
+Rules:
+- no imports
+- inspect only the provided `trace` dict
+- return a list of pattern dicts
+- each pattern dict must contain `label`, `start_timestep`, `end_timestep`, and `parameters`
+- use inclusive timestep spans; if the pattern is effectively instantaneous, set `start_timestep == end_timestep`
+- choose the narrowest specific timestep span supported by the evidence; do not default to the full trace unless the pattern truly persists for the entire trace
+- `parameters` must include an `object_details` dict keyed by object id or role, with each entry describing the object's role in the pattern, geometry/shape, and where the pattern starts/ends for that object
+- include object-location details directly in `parameters` when you can infer them from the trace; do not leave the pattern undescribed if object participation is visible
+- optional fields are `provenance` and `metadata`
+- use the exact target label `{{ label }}`
+- if the pattern is absent, return []
+
+I-PHYRE trace structure:
+- `trace["timesteps"]` is the main signal
+- each timestep has `objects`; each object usually has `index`, `x1`, `y1`, `x2`, `y2`, `radius`, `eliminable`, `dynamic`, `joint`, `spring`
+- objects are better interpreted as line segments / endpoints / circular extents than as simple points
+- the object center can be approximated from `((x1+x2)/2, (y1+y2)/2)`
+- for circular objects, `x1 == x2` and `y1 == y2`
+- `joint` and `spring` are numeric identifiers; `0` means none, nonzero values identify a joint/spring group
+- `trace["events"]` often contains sparse `scheduled_action` entries that mark external interventions
+- `trace["outcome"]` stores task reward, solved threshold, translated actions, and terminal status
+
+How to write good I-PHYRE detectors:
+- use geometry over time: support, contact, containment, or escape often appear in relative segment positions
+- use `dynamic`, `eliminable`, `joint`, and `spring` values to distinguish object roles
+- scheduled actions are informative but usually not sufficient on their own; combine them with state changes when possible
+- prefer robust relative comparisons instead of exact coordinates because tasks differ
+- emit the inclusive timestep range where the pattern is clearly present
+- pick concrete start/end timesteps where the pattern is actually visible, not just the earliest and latest timestep in the trace
+
+Compact trace example:
+```python
+{
+  "environment": "iphyre",
+  "task_id": "str",
+  "timesteps": [
+    {
+      "index": int,
+      "t": float,
+      "objects": [
+        {
+          "index": int,
+          "x1": float,
+          "y1": float,
+          "x2": float,
+          "y2": float,
+          "radius": float,
+          "eliminable": float,
+          "dynamic": float,
+          "joint": int,
+          "spring": int
+        }
+      ]
+    }
+  ],
+  "events": [{"kind": "scheduled_action", "t": float, "payload": {...}}],
+  "outcome": {"success": bool, "terminal_status": "str", "metrics": {...}}
+}
+```
+
+Your objective is to maximize the training reward.
+Learn from these examples what works, keep the strong ideas from both parents, drop brittle logic, and write one stronger `find_pattern(trace)` implementation.
+
+Parent A code:
+```python
+{{ parent_a_code }}
+```
+Parent A training reward to maximize: {{ parent_a_metadata.average_score }}
+
+Parent B code:
+```python
+{{ parent_b_code }}
+```
+Parent B training reward to maximize: {{ parent_b_metadata.average_score }}

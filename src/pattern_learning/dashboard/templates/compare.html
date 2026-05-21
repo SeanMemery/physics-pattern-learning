@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero hero-compact">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ summary.env_id }}">{{ summary.env_id }}</a> / compare</p>
+  <h1>{{ summary.env_id }} compare runs</h1>
+  <p>Review supervised runs side by side, compare DeepPHY coverage, and inspect label-level reward differences.</p>
+  <div class="button-row">
+    <a class="secondary-button" href="/env/{{ summary.env_id }}">Open workspace</a>
+    <a class="secondary-button" href="/env/{{ summary.env_id }}/libraries">Open libraries</a>
+  </div>
+</section>
+
+<section class="content-grid compare-layout">
+  <section class="panel compare-selection-panel">
+    <div class="card-topline">
+      <div>
+        <h2>Select runs</h2>
+        <p class="metric-subtle">Choose up to four supervised runs from this environment.</p>
+      </div>
+      <span class="pill">{{ selected_run_ids|length }} selected</span>
+    </div>
+    <form method="get" action="/env/{{ summary.env_id }}/compare" class="compare-selection-form">
+      <div class="metric-stack compact-metrics compare-run-list">
+        {% for run in available_runs %}
+        {% set latest_eval = run.evaluation_runs[0] if run.evaluation_runs else None %}
+        <label class="metric-row compact-row compare-run-row">
+          <div class="metric-main">
+            <div class="metric-title">{{ run.run_id }}</div>
+            <div class="metric-subtle">
+              {{ run.label_count }} labels · {{ run.candidate_count }} candidates
+              {% if latest_eval and latest_eval.success_ratio is not none %}
+              · eval {{ "%.1f%%"|format(latest_eval.success_ratio * 100) }}
+              {% elif not latest_eval %}
+              · eval missing
+              {% endif %}
+            </div>
+          </div>
+          <div class="job-inline-actions">
+            <input type="checkbox" name="run_id" value="{{ run.run_id }}" {% if run.run_id in selected_run_ids %}checked{% endif %}>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+      <div class="button-row">
+        <button class="primary-button" type="submit">Compare selected</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel compare-results-panel">
+    <div class="card-topline">
+      <div>
+        <h2>Run overview</h2>
+        <p class="metric-subtle">High-level reward and evaluation status for the selected runs.</p>
+      </div>
+    </div>
+    {% if selected_runs %}
+    <div class="compare-cards-grid">
+      {% for item in selected_runs %}
+      {% set run = item.detail %}
+      {% set latest_eval = item.latest_eval %}
+      <article class="compare-card">
+        <div class="compare-card-head">
+          <div class="metric-title"><a href="/runs/{{ summary.env_id }}/{{ item.run_id }}">{{ item.run_id }}</a></div>
+          <span class="pill{% if latest_eval and latest_eval.success_ratio is not none %} status-succeeded{% elif not latest_eval %} status-failed{% endif %}">
+            {% if latest_eval and latest_eval.success_ratio is not none %}
+              {{ "%.1f%%"|format(latest_eval.success_ratio * 100) }} eval
+            {% elif latest_eval %}
+              eval saved
+            {% else %}
+              eval missing
+            {% endif %}
+          </span>
+        </div>
+        <div class="summary-grid compare-summary-grid">
+          <div class="summary-cell">
+            <span class="summary-label">Avg reward</span>
+            <strong class="summary-value">{{ "%.3f"|format(run.average_score) if run.average_score is not none else "—" }}</strong>
+          </div>
+          <div class="summary-cell">
+            <span class="summary-label">Train</span>
+            <strong class="summary-value">{{ "%.3f"|format(run.mean_train_score) if run.mean_train_score is not none else "—" }}</strong>
+          </div>
+          <div class="summary-cell">
+            <span class="summary-label">Validation</span>
+            <strong class="summary-value">{{ "%.3f"|format(run.mean_validation_score) if run.mean_validation_score is not none else "—" }}</strong>
+          </div>
+          <div class="summary-cell">
+            <span class="summary-label">Candidates</span>
+            <strong class="summary-value">{{ run.candidate_count }}</strong>
+          </div>
+        </div>
+        <div class="metric-subtle recent-run-meta">
+          {{ run.label_telemetry|length }} labels{% if run.sample_count is not none %} · {{ run.sample_count }} samples{% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+
+    <section class="compare-table-section">
+      <div class="panel-header-row">
+        <div>
+          <h3>Label comparison</h3>
+          <p class="metric-subtle">Best train and validation reward for each label in each selected run.</p>
+        </div>
+      </div>
+      {% if label_rows %}
+      <div class="scroll-table compact-scroll-table">
+        <table class="data-table compact-table compare-table">
+          <thead>
+            <tr>
+              <th>Label</th>
+              {% for item in selected_runs %}
+              <th>{{ item.run_id }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in label_rows %}
+            <tr>
+              <td>{{ row.label_name }}</td>
+              {% for cell in row.cells %}
+              <td class="{% if row.best_validation_run_id == cell.run_id %}compare-best-cell{% endif %}">
+                {% if cell.present %}
+                <div class="compare-cell-metric">
+                  <span class="compare-cell-label">train</span>
+                  <strong>{{ "%.3f"|format(cell.best_train_score) if cell.best_train_score is not none else "—" }}</strong>
+                </div>
+                <div class="compare-cell-metric">
+                  <span class="compare-cell-label">val</span>
+                  <strong>{{ "%.3f"|format(cell.best_validation_score) if cell.best_validation_score is not none else "—" }}</strong>
+                </div>
+                <div class="metric-subtle">{{ cell.candidate_count }} candidates</div>
+                {% else %}
+                <span class="metric-subtle">—</span>
+                {% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty">No comparable label telemetry was found.</p>
+      {% endif %}
+    </section>
+    {% else %}
+    <p class="empty">Select two or more runs to compare them side by side.</p>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

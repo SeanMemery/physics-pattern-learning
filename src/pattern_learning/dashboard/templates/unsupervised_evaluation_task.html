@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block content %}
+{% set route_base = run_route_base if run_route_base is defined else '/automatic' %}
+{% set kind_label = run_kind_label if run_kind_label is defined else 'automatic' %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ env_id }}">{{ env_id }}</a> / <a href="{{ route_base }}/{{ env_id }}/{{ run_id }}">{{ run_id }}</a> / <a href="{{ route_base }}/{{ env_id }}/{{ run_id }}/evaluations/{{ evaluation.run_id }}">{{ evaluation.run_id }}</a> / {{ task.task_id or task.task_token }}</p>
+  <h1>{{ env_id }} · {{ kind_label }} · {{ run_id }} · {{ evaluation.run_id }} · {{ task.task_id or task.task_token }}</h1>
+  <p>Low-level task detail for one DeepPHY evaluation task, including prompt inputs, trace annotations, replay media, and model outputs.</p>
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <span class="stat-label">Outcome</span>
+      <strong class="stat-value">
+        {% if task.success is sameas true %}success{% elif task.success is sameas false %}failure{% else %}—{% endif %}
+      </strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Terminal</span>
+      <strong class="stat-value">{{ task.terminal_status or "—" }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Records</span>
+      <strong class="stat-value">{{ task.record_count }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Task time</span>
+      <strong class="stat-value">{{ format_duration(task.total_duration_seconds) }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Model</span>
+      <strong class="stat-value">{{ task.model_name or "—" }}</strong>
+    </div>
+  </div>
+</section>
+
+<div class="button-row">
+  <a class="secondary-button" href="{{ route_base }}/{{ env_id }}/{{ run_id }}/evaluations/{{ evaluation.run_id }}">Back to evaluation</a>
+</div>
+
+<section class="panel">
+  <h2>Task summary</h2>
+  <div class="compact-metric-list">
+    <div class="metric-row compact-metric-row"><span>Prompt format</span><strong>{{ task.prompt_format or "—" }}</strong></div>
+    <div class="metric-row compact-metric-row"><span>Description mode</span><strong>{{ task.description_mode or "—" }}</strong></div>
+    {% for name, value in task.native_metrics.items() %}
+    <div class="metric-row compact-metric-row"><span>{{ name }}</span><strong>{{ value }}</strong></div>
+    {% endfor %}
+  </div>
+</section>
+
+{% if task.records %}
+<section class="panel">
+  <div class="task-record-header">
+    <div>
+      <h2>Attempts</h2>
+      <p class="metric-subtle">Select one LLM attempt at a time to inspect its prompt, output, and resulting annotation trace.</p>
+    </div>
+    {% if selected_attempt %}
+    <div class="evaluation-inline-list">
+      <span class="mini-chip">attempt {{ selected_attempt.index }}</span>
+      <span class="mini-chip">{{ format_duration(selected_attempt.duration_seconds) }}</span>
+      {% if selected_attempt.success is sameas true %}<span class="mini-chip">success</span>{% elif selected_attempt.success is sameas false %}<span class="mini-chip mini-chip-off">failure</span>{% endif %}
+      {% if selected_attempt.terminal_status %}<span class="mini-chip">{{ selected_attempt.terminal_status }}</span>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  <div class="attempt-selector">
+    {% for record in task.records %}
+      <a
+        class="attempt-pill{% if selected_attempt and record.index == selected_attempt.index %} attempt-pill-active{% endif %}"
+        href="{{ route_base }}/{{ env_id }}/{{ run_id }}/evaluations/{{ evaluation.run_id }}/tasks/{{ task.task_token }}?attempt={{ record.index }}"
+      >
+        Attempt {{ record.index }} · {{ format_duration(record.duration_seconds) }}
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="content-grid">
+  {% if task.prompt_images and task.task_token %}
+  <section class="panel">
+    <h2>Prompt images</h2>
+    <p class="metric-subtle">These are the initial images attached to the LLM request for this task.</p>
+    <div class="task-record-stack">
+      {% for image in task.prompt_images %}
+      <article class="task-record-card">
+        <div class="task-record-header">
+          <h3>{{ image.label }}</h3>
+        </div>
+        <img
+          class="preview-image"
+          alt="{{ image.label }} for {{ task.task_id }}"
+          src="{{ route_base }}/{{ env_id }}/{{ run_id }}/evaluations/{{ evaluation.run_id }}/tasks/{{ task.task_token }}/media/{{ image.filename }}"
+        />
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  {% if task.simulation_path and task.task_token %}
+  <section class="panel">
+    <h2>Action replay</h2>
+    <p class="metric-subtle">Replay of the recorded task attempt.</p>
+    <video class="preview-video" controls preload="metadata">
+      <source src="{{ route_base }}/{{ env_id }}/{{ run_id }}/evaluations/{{ evaluation.run_id }}/tasks/{{ task.task_token }}/media/simulation.mp4" type="video/mp4">
+      Your browser does not support embedded video playback.
+    </video>
+  </section>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Selected attempt</h2>
+  {% if selected_attempt %}
+    {% set record = selected_attempt %}
+    <article class="task-record-card">
+      <div class="task-record-header">
+        <h3>{{ record.record_kind or "record" }} {{ record.index }}</h3>
+        <div class="evaluation-inline-list">
+          <span class="mini-chip">{{ format_duration(record.duration_seconds) }}</span>
+          {% if record.prompt_format %}<span class="mini-chip">{{ record.prompt_format }}</span>{% endif %}
+          {% if record.description_mode %}<span class="mini-chip">{{ record.description_mode }}</span>{% endif %}
+          {% if record.success is sameas true %}<span class="mini-chip">success</span>{% elif record.success is sameas false %}<span class="mini-chip mini-chip-off">failure</span>{% endif %}
+          {% if record.terminal_status %}<span class="mini-chip">{{ record.terminal_status }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="task-record-grid">
+        <section class="task-record-block">
+          <h4>System prompt</h4>
+          <pre class="code-block">{{ record.system_prompt or "—" }}</pre>
+        </section>
+        <section class="task-record-block">
+          <h4>User prompt</h4>
+          <pre class="code-block">{{ record.user_prompt or "—" }}</pre>
+        </section>
+      </div>
+      <div class="task-record-grid">
+        <section class="task-record-block">
+          <h4>Simulation trace annotations</h4>
+          <div class="annotation-view">
+            {% if record.trace_annotation_overview %}
+            <div class="annotation-summary">
+              <span class="annotation-label">Overview</span>
+              <pre class="code-block annotation-overview">{{ record.trace_annotation_overview }}</pre>
+            </div>
+            {% endif %}
+            {% if record.trace_annotation_rows %}
+            <div class="annotation-summary">
+              <span class="annotation-label">Detected patterns</span>
+              <div class="annotation-table">
+                <div class="annotation-table-head">When</div>
+                <div class="annotation-table-head">Label</div>
+                <div class="annotation-table-head">Parameters</div>
+                {% for row in record.trace_annotation_rows %}
+                <div class="annotation-cell annotation-step">{{ row.step_text }}</div>
+                <div class="annotation-cell annotation-name">{{ row.label }}</div>
+                <div class="annotation-cell annotation-params">{{ row.parameter_text or "—" }}</div>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+            {% if record.trace_annotation_notes %}
+            <div class="annotation-summary">
+              <span class="annotation-label">Notes</span>
+              <div class="evaluation-inline-list">
+                {% for note in record.trace_annotation_notes %}
+                <span class="mini-chip">{{ note }}</span>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+            <details class="annotation-raw">
+              <summary>Raw annotation text</summary>
+              <pre class="code-block">{{ record.trace_description or "—" }}</pre>
+            </details>
+          </div>
+        </section>
+      </div>
+      <div class="task-record-grid">
+        <section class="task-record-block">
+          <h4>Model output</h4>
+          <pre class="code-block">{{ record.raw_model_output or "—" }}</pre>
+        </section>
+        <section class="task-record-block">
+          <h4>Parsed action</h4>
+          <pre class="code-block">{{ record.parsed_action|tojson(indent=2) }}</pre>
+        </section>
+      </div>
+    </article>
+  {% else %}
+    <p class="empty">No saved LLM prompt/response records were found for this task yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

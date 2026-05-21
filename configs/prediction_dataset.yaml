@@ -1,0 +1,6 @@
+config_version: "1"
+split:
+  - train
+limit: 3
+cutoff_count: 5
+prediction_timeout: 120

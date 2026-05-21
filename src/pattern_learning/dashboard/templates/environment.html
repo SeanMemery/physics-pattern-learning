@@ -1,0 +1,1051 @@
+{% extends "base.html" %}
+{% block content %}
+{% set supervised_active = namespace(count=0) %}
+{% set automatic_active = namespace(count=0) %}
+{% set unsupervised_active = namespace(count=0) %}
+{% set dataset_active = namespace(count=0) %}
+{% set failed_jobs = namespace(count=0) %}
+{% for job in environment_jobs %}
+  {% if job.metadata.get("workflow_kind") == "supervised" and job.status in ["queued", "running", "paused"] %}
+    {% set supervised_active.count = supervised_active.count + 1 %}
+  {% endif %}
+  {% if job.metadata.get("workflow_kind") == "automatic" and job.status in ["queued", "running", "paused"] %}
+    {% set automatic_active.count = automatic_active.count + 1 %}
+  {% endif %}
+  {% if job.metadata.get("workflow_kind") == "unsupervised" and job.status in ["queued", "running", "paused"] %}
+    {% set unsupervised_active.count = unsupervised_active.count + 1 %}
+  {% endif %}
+  {% if job.metadata.get("action") == "build-dataset" and job.status in ["queued", "running", "paused"] %}
+    {% set dataset_active.count = dataset_active.count + 1 %}
+  {% endif %}
+  {% if job.status == "failed" %}
+    {% set failed_jobs.count = failed_jobs.count + 1 %}
+  {% endif %}
+{% endfor %}
+
+<section class="hero hero-compact">
+  <p class="breadcrumb"><a href="/">Home</a> / {{ summary.env_id }}</p>
+  <h1>{{ summary.env_id }}</h1>
+  <p>Run learning, adjust labels, and manage dataset collection from one compact workspace.</p>
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <span class="stat-label">Supervised</span>
+      <strong class="stat-value">{{ summary.supervised_libraries|length }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Automatic</span>
+      <strong class="stat-value">{{ summary.automatic_libraries|length }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Unsupervised</span>
+      <strong class="stat-value">{{ summary.unsupervised_libraries|length }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Datasets</span>
+      <strong class="stat-value">{{ summary.datasets|length }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Labels</span>
+      <strong class="stat-value">{{ summary.target_labels.label_count if summary.target_labels else 0 }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Active runs</span>
+      <strong class="stat-value">{{ supervised_active.count + automatic_active.count + unsupervised_active.count }}</strong>
+    </div>
+  </div>
+  <div class="button-row">
+    <a class="secondary-button" href="/env/{{ summary.env_id }}/libraries">Open library viewer</a>
+    <a class="secondary-button" href="/env/{{ summary.env_id }}/compare">Compare supervised runs</a>
+  </div>
+  {% if failed_jobs.count > 0 %}
+  <div class="button-row">
+    <form method="post" action="/jobs/clear-failed">
+      <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+      <button class="secondary-button danger-button" type="submit">Clear all failed ({{ failed_jobs.count }})</button>
+    </form>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel tool-row workspace-panel">
+  <div class="card-topline">
+    <div>
+      <h2>Image-only DeepPHY</h2>
+      <p class="metric-subtle">Queue benchmark runs for a specific LM using only the benchmark images and attempt history, with no learned library attached.</p>
+    </div>
+    <span class="pill">{{ summary.image_only_evaluations|length }} saved</span>
+  </div>
+  {% if image_only_evaluation_error %}
+  <p class="form-error">Image-only eval invalid: {{ image_only_evaluation_error }}</p>
+  {% endif %}
+  <div class="env-section-grid">
+    <div class="env-launch-column">
+      <div class="section-label">Queue image-only eval</div>
+      <form class="launch-form" method="post" action="/env/{{ summary.env_id }}/image-only-evaluations/launch">
+        <div class="form-grid compact-form-grid">
+          <label>
+            <span>LM name</span>
+            <input type="text" name="model" value="{{ image_only_evaluation_values.model or '' }}" placeholder="blank string default">
+          </label>
+          <label>
+            <span>Workers</span>
+            <input type="number" min="1" name="workers" value="{{ image_only_evaluation_values.workers or '1' }}">
+          </label>
+          <label>
+            <span>Template</span>
+            <select name="benchmark_preset">
+              {% for option in ["full", "quick-eval", "test"] %}
+                <option value="{{ option }}" {% if image_only_evaluation_values.benchmark_preset == option %}selected{% endif %}>{{ option }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+        <div class="button-row launch-button-row">
+          <button class="primary-button" type="submit">Queue image-only eval</button>
+        </div>
+      </form>
+    </div>
+    <div class="env-activity-column">
+      <div class="section-label">Saved LM performance</div>
+      {% if summary.image_only_evaluations %}
+      <div class="scroll-table compact-scroll-table">
+        <table class="data-table compact-table">
+          <thead>
+            <tr>
+              <th>LM</th>
+              <th>Template</th>
+              <th>Status</th>
+              <th>Success</th>
+              <th>Time</th>
+              <th>Run</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for evaluation in summary.image_only_evaluations[:12] %}
+            <tr>
+              <td class="truncate">{{ evaluation.model_name if evaluation.model_name is not none and evaluation.model_name != "" else "(router default)" }}</td>
+              <td>{{ evaluation.benchmark_preset or "—" }}</td>
+              <td><span class="pill status-{{ evaluation.status }}">{{ evaluation.status }}</span></td>
+              <td>
+                {% if evaluation.success_ratio is not none %}
+                  {{ evaluation.success_count }}/{{ evaluation.task_count }} · {{ "%.1f%%"|format(evaluation.success_ratio * 100) }}
+                {% else %}
+                  {{ evaluation.task_count }} seen
+                {% endif %}
+              </td>
+              <td>{{ format_duration(evaluation.total_duration_seconds) }}</td>
+              <td>{{ evaluation.run_id }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty inline">No image-only evaluations saved yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="tool-stack env-tool-grid">
+  <section class="panel tool-row workspace-panel">
+    <div class="card-topline">
+      <div>
+        <h2>1. Supervised learning run</h2>
+        <p class="metric-subtle">Launch a supervised run and keep the active search plus recent saved libraries visible beside the launch controls.</p>
+      </div>
+      <span class="pill">{{ supervised_active.count }} active</span>
+    </div>
+    {% if launch_error %}
+    <p class="form-error">Launch request invalid: {{ launch_error }}</p>
+    {% endif %}
+    <div class="env-section-grid">
+      <div class="env-launch-column">
+        <div class="section-label">Launch</div>
+        <form class="launch-form" method="post" action="/env/{{ summary.env_id }}/learn" data-funsearch-form data-funsearch-templates='{{ funsearch_templates|tojson }}'>
+          <div class="form-grid compact-form-grid">
+            <label>
+              Dataset
+              <select name="dataset_name" {% if not learning_dataset_options %}disabled{% endif %}>
+                {% if not learning_dataset_options %}
+                  <option value="" selected>No available datasets</option>
+                {% endif %}
+                {% for option in learning_dataset_options %}
+                  <option value="{{ option.dataset_name }}" {% if launch_values.dataset_name == option.dataset_name %}selected{% endif %}>{{ option.dataset_name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span class="label-with-info">
+                <span>Template</span>
+                <span class="info-tooltip" tabindex="0" aria-label="FunSearch template help">
+                  i
+                  <span class="tooltip-panel">
+                    Apply a named FunSearch parameter preset. You can still edit the values after selecting one.
+                  </span>
+                </span>
+              </span>
+              <select name="funsearch_template" data-funsearch-template-select>
+                {% for template_name, template in funsearch_templates.items() %}
+                  <option value="{{ template_name }}" {% if launch_values.funsearch_template == template_name %}selected{% endif %}>{{ template.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span class="label-with-info">
+                <span>Iterations</span>
+                <span class="info-tooltip" tabindex="0" aria-label="FunSearch iteration help">
+                  i
+                  <span class="tooltip-panel">
+                    Number of FunSearch evolutionary rounds run for each label.
+                  </span>
+                </span>
+              </span>
+              <input type="number" min="1" name="iteration_count" value="{{ launch_values.iteration_count or '1' }}" data-funsearch-template-field="iteration_count">
+            </label>
+            <label>
+              <span class="label-with-info">
+                <span>Workers</span>
+                <span class="info-tooltip" tabindex="0" aria-label="FunSearch workers help">
+                  i
+                  <span class="tooltip-panel">
+                    Number of labels learned in parallel. Each worker runs one label search at a time.
+                  </span>
+                </span>
+              </span>
+              <input type="number" min="1" name="workers" value="{{ launch_values.workers or '1' }}">
+            </label>
+            <label>
+              <span class="label-with-info">
+                <span>LM name</span>
+                <span class="info-tooltip" tabindex="0" aria-label="Supervised LM name help">
+                  i
+                  <span class="tooltip-panel">
+                    Exact router model name to send with this job. Leave blank to use the router default blank model.
+                  </span>
+                </span>
+              </span>
+              <input type="text" name="model" value="{{ launch_values.model or '' }}" placeholder="blank string default">
+            </label>
+            <label>
+              <span class="label-with-info">
+                <span>Seed</span>
+                <span class="info-tooltip" tabindex="0" aria-label="FunSearch seed help">
+                  i
+                  <span class="tooltip-panel">
+                    Random seed passed into FunSearch for population initialization and search-time randomness.
+                  </span>
+                </span>
+              </span>
+              <input type="number" name="seed" value="{{ launch_values.seed or '' }}" placeholder="42">
+            </label>
+            <label>
+              <span class="label-with-info">
+                <span>Population</span>
+                <span class="info-tooltip" tabindex="0" aria-label="FunSearch population help">
+                  i
+                  <span class="tooltip-panel">
+                    Number of candidate programs kept in the search population for a label.
+                  </span>
+                </span>
+              </span>
+              <input type="number" min="1" name="population_size" value="{{ launch_values.population_size or '' }}" placeholder="12" data-funsearch-template-field="population_size">
+            </label>
+            <label>
+              <span class="label-with-info">
+                <span>Elite fraction</span>
+                <span class="info-tooltip" tabindex="0" aria-label="FunSearch elite fraction help">
+                  i
+                  <span class="tooltip-panel">
+                    Fraction of the population treated as elite parents each iteration.
+                  </span>
+                </span>
+              </span>
+              <input type="number" min="0" max="1" step="0.01" name="elite_fraction" value="{{ launch_values.elite_fraction or '' }}" placeholder="0.25" data-funsearch-template-field="elite_fraction">
+            </label>
+            <label>
+              <span class="label-with-info">
+                <span>Children per elite</span>
+                <span class="info-tooltip" tabindex="0" aria-label="FunSearch children per elite help">
+                  i
+                  <span class="tooltip-panel">
+                    Number of mutated children generated from each elite parent in one iteration.
+                  </span>
+                </span>
+              </span>
+              <input type="number" min="0" name="children_per_elite" value="{{ launch_values.children_per_elite or '' }}" placeholder="2" data-funsearch-template-field="children_per_elite">
+            </label>
+            <label>
+              <span class="label-with-info">
+                <span>Crossover rate</span>
+                <span class="info-tooltip" tabindex="0" aria-label="FunSearch crossover rate help">
+                  i
+                  <span class="tooltip-panel">
+                    Probability that a child is generated by crossover between two parents instead of single-parent mutation.
+                  </span>
+                </span>
+              </span>
+              <input type="number" min="0" max="1" step="0.01" name="crossover_rate" value="{{ launch_values.crossover_rate or '' }}" placeholder="1.0">
+            </label>
+          </div>
+          <p class="metric-subtle">This always learns on the train split and reports held-out validation curves from the validation split.</p>
+          <div class="button-row launch-button-row">
+            <button class="primary-button" type="submit" name="launch_mode" value="run_now">Run now</button>
+            <button class="secondary-button" type="submit" name="launch_mode" value="queue">Queue</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="env-activity-column">
+        <div class="section-label">Active and recent</div>
+        <div class="button-row env-inline-actions">
+          <form id="supervised-compare-form" method="get" action="/env/{{ summary.env_id }}/compare"></form>
+          <button class="secondary-button" type="submit" form="supervised-compare-form">Compare selected</button>
+        </div>
+        {% set supervised_live_jobs = namespace(count=0) %}
+        {% set supervised_failed_jobs = namespace(count=0) %}
+        <div class="metric-stack compact-metrics env-job-scrollbox">
+      {% for job in environment_jobs %}
+        {% if job.metadata.get("workflow_kind") == "supervised" and job.status in ["queued", "running", "paused"] %}
+        {% set supervised_live_jobs.count = supervised_live_jobs.count + 1 %}
+        <div class="metric-row compact-row">
+          <div class="metric-main">
+            <div class="metric-title"><a href="{{ job.learning_progress.run_url if job.learning_progress else '/jobs/' ~ job.job_id }}">{{ job.display_name }}</a></div>
+            <div class="metric-subtle">{{ display_time(job.created_at) }} · {{ job.name }}</div>
+            {% include "_learning_job_compact.html" %}
+          </div>
+          <div class="job-inline-actions">
+            <span class="pill status-{{ job.status }}">{{ job.status }}</span>
+            {% if job.metadata.get("supports_pause") and job.status in ["queued", "running"] %}
+            <form method="post" action="/jobs/{{ job.job_id }}/pause">
+              <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+              <button class="secondary-button" type="submit">Pause</button>
+            </form>
+            {% elif job.status == "paused" %}
+            <form method="post" action="/jobs/{{ job.job_id }}/resume">
+              <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+              <button class="secondary-button" type="submit">Unpause</button>
+            </form>
+            <form method="post" action="/jobs/{{ job.job_id }}/exit">
+              <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+              <button class="secondary-button danger-button" type="submit">Exit</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+      {% if supervised_live_jobs.count == 0 %}
+      <p class="empty inline">No active supervised jobs.</p>
+      {% endif %}
+      {% for job in environment_jobs %}
+        {% if job.metadata.get("workflow_kind") == "supervised" and job.status == "failed" %}
+        {% if supervised_failed_jobs.count == 0 %}
+      <div class="section-label compact-section-label">Recent failed jobs</div>
+        {% endif %}
+        {% set supervised_failed_jobs.count = supervised_failed_jobs.count + 1 %}
+        <div class="metric-row compact-row">
+          <div class="metric-main">
+            <div class="metric-title"><a href="{{ job.learning_progress.run_url if job.learning_progress else '/jobs/' ~ job.job_id }}">{{ job.display_name }}</a></div>
+            <div class="metric-subtle">{{ display_time(job.created_at) }} · {{ job.name }}</div>
+            {% include "_learning_job_compact.html" %}
+          </div>
+          <div class="job-inline-actions">
+            <span class="pill status-{{ job.status }}">{{ job.status }}</span>
+            <form method="post" action="/jobs/{{ job.job_id }}/resume">
+              <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+              <button class="secondary-button" type="submit">Resume failed run</button>
+            </form>
+            <form method="post" action="/jobs/{{ job.job_id }}/clear">
+              <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+              <button class="secondary-button danger-button" type="submit">Clear</button>
+            </form>
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+      {% for run in summary.supervised_libraries[:8] %}
+      <div class="metric-row compact-row">
+        <div class="metric-main">
+          <div class="metric-title"><a href="/runs/{{ summary.env_id }}/{{ run.run_id }}">{{ run.run_id }}</a></div>
+          <div class="metric-subtle">{{ run.label_count }} labels · {{ run.candidate_count }} candidates{% if run.sample_count is not none %} · {{ run.sample_count }} samples{% endif %}</div>
+        </div>
+        <div class="job-inline-actions">
+          <label class="compare-pick">
+            <input type="checkbox" name="run_id" value="{{ run.run_id }}" form="supervised-compare-form">
+            <span>compare</span>
+          </label>
+          {% if run.average_score is not none %}
+          <span class="score">{{ "%.3f"|format(run.average_score) }}</span>
+          {% else %}
+          <span class="pill">saved</span>
+          {% endif %}
+          {% if run.evaluation_runs %}
+          <span class="pill">{{ "%.1f%%"|format(run.evaluation_runs[0].success_ratio * 100) if run.evaluation_runs[0].success_ratio is not none else "eval saved" }}</span>
+          {% else %}
+          <span class="pill status-failed">eval missing</span>
+          {% endif %}
+          <form method="post" action="/runs/{{ summary.env_id }}/{{ run.run_id }}/delete" onsubmit="return confirm('Delete supervised run {{ run.run_id }}? This removes the learned library, candidates, and evaluations.');">
+            <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+            <button class="secondary-button danger-button" type="submit">Delete</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+      {% if supervised_active.count == 0 and not summary.supervised_libraries %}
+      <p class="empty inline">No supervised runs yet.</p>
+      {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel tool-row workspace-panel">
+    <div class="card-topline">
+      <div>
+        <h2>2. Automatic learning run</h2>
+        <p class="metric-subtle">Choose a supervised library and evaluation, generate labels from reasoning traces, then learn and evaluate the combined library.</p>
+      </div>
+      <span class="pill">{{ automatic_active.count }} active</span>
+    </div>
+    {% if unsupervised_launch_error %}
+    <p class="form-error">Automatic launch invalid: {{ unsupervised_launch_error }}</p>
+    {% endif %}
+    <div class="env-section-grid">
+      <div class="env-launch-column">
+        <div class="section-label">Launch</div>
+        <form class="launch-form" method="post" action="/env/{{ summary.env_id }}/automatic/launch" data-funsearch-form data-funsearch-templates='{{ funsearch_templates|tojson }}'>
+          <div class="form-grid compact-form-grid">
+        <label>
+          <span class="label-with-info">
+            <span>Source supervised library</span>
+            <span class="info-tooltip" tabindex="0" aria-label="Automatic source supervised library help">
+              i
+              <span class="tooltip-panel">
+                A saved or queued supervised run that provides the base patterns and source run metadata for this automatic run.
+              </span>
+            </span>
+          </span>
+          <select name="source_supervised_run_dir" {% if not supervised_library_options %}disabled{% endif %} required>
+            {% if not supervised_library_options %}
+              <option value="" selected>No supervised libraries available</option>
+            {% endif %}
+            {% for option in supervised_library_options %}
+              <option value="{{ option.value }}" {% if unsupervised_launch_values.source_supervised_run_dir == option.value %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span class="label-with-info">
+            <span>Source evaluation</span>
+            <span class="info-tooltip" tabindex="0" aria-label="Automatic source evaluation help">
+              i
+              <span class="tooltip-panel">
+                Choose Auto for queued or in-progress supervised sources, or pick a saved supervised DeepPHY evaluation explicitly.
+              </span>
+            </span>
+          </span>
+          <select name="source_evaluation_run_id" {% if not supervised_library_options %}disabled{% endif %} required>
+            {% if not supervised_library_options %}
+              <option value="" selected>No supervised evaluations available</option>
+            {% endif %}
+            {% for option in supervised_evaluation_options %}
+              <option value="{{ option.value }}" {% if unsupervised_launch_values.source_evaluation_run_id == option.value %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span class="label-with-info">
+            <span>Reasoning traces</span>
+            <span class="info-tooltip" tabindex="0" aria-label="Automatic reasoning trace count help">
+              i
+              <span class="tooltip-panel">
+                Number of reasoning traces sampled from the source evaluation before asking the label-proposal model for new labels.
+              </span>
+            </span>
+          </span>
+          <input type="number" min="1" name="reasoning_trace_count" value="{{ unsupervised_launch_values.reasoning_trace_count or '6' }}">
+        </label>
+        <label>
+          <span class="label-with-info">
+            <span>Proposed labels</span>
+            <span class="info-tooltip" tabindex="0" aria-label="Automatic proposed label count help">
+              i
+              <span class="tooltip-panel">
+                Maximum number of new labels requested from the label-proposal model for this automatic run.
+              </span>
+            </span>
+          </span>
+          <input type="number" min="1" name="proposed_label_count" value="{{ unsupervised_launch_values.proposed_label_count or '5' }}">
+        </label>
+        <label>
+          <span class="label-with-info">
+            <span>LM name</span>
+            <span class="info-tooltip" tabindex="0" aria-label="Automatic LM name help">
+              i
+              <span class="tooltip-panel">
+                Exact router model name to send for label proposal, learning mutations, and combined evaluation. Leave blank to use the router default blank model.
+              </span>
+            </span>
+          </span>
+          <input type="text" name="model" value="{{ unsupervised_launch_values.model or '' }}" placeholder="blank string default">
+        </label>
+        <label>
+          <span class="label-with-info">
+            <span>Template</span>
+            <span class="info-tooltip" tabindex="0" aria-label="Automatic FunSearch template help">
+              i
+              <span class="tooltip-panel">
+                Apply a named FunSearch parameter preset. You can still edit the values after selecting one.
+              </span>
+            </span>
+          </span>
+          <select name="funsearch_template" data-funsearch-template-select>
+            {% for template_name, template in funsearch_templates.items() %}
+              <option value="{{ template_name }}" {% if unsupervised_launch_values.funsearch_template == template_name %}selected{% endif %}>{{ template.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span class="label-with-info">
+            <span>Iterations</span>
+            <span class="info-tooltip" tabindex="0" aria-label="Automatic FunSearch iteration help">
+              i
+              <span class="tooltip-panel">
+                Number of FunSearch evolutionary rounds run for each proposed label.
+              </span>
+            </span>
+          </span>
+          <input type="number" min="1" name="iteration_count" value="{{ unsupervised_launch_values.iteration_count or '1' }}" data-funsearch-template-field="iteration_count">
+        </label>
+        <label>
+          <span class="label-with-info">
+            <span>Workers</span>
+            <span class="info-tooltip" tabindex="0" aria-label="Automatic FunSearch workers help">
+              i
+              <span class="tooltip-panel">
+                Number of proposed labels learned in parallel. Each worker runs one label search at a time.
+              </span>
+            </span>
+          </span>
+          <input type="number" min="1" name="workers" value="{{ unsupervised_launch_values.workers or '1' }}">
+        </label>
+        <label>
+          <span class="label-with-info">
+            <span>Seed</span>
+            <span class="info-tooltip" tabindex="0" aria-label="Automatic FunSearch seed help">
+              i
+              <span class="tooltip-panel">
+                Random seed passed into FunSearch for population initialization and search-time randomness.
+              </span>
+            </span>
+          </span>
+          <input type="number" name="seed" value="{{ unsupervised_launch_values.seed or '' }}" placeholder="42">
+        </label>
+        <label>
+          <span class="label-with-info">
+            <span>Population</span>
+            <span class="info-tooltip" tabindex="0" aria-label="Automatic FunSearch population help">
+              i
+              <span class="tooltip-panel">
+                Number of candidate programs kept in the search population for each proposed label.
+              </span>
+            </span>
+          </span>
+          <input type="number" min="1" name="population_size" value="{{ unsupervised_launch_values.population_size or '' }}" placeholder="12" data-funsearch-template-field="population_size">
+        </label>
+        <label>
+          <span class="label-with-info">
+            <span>Elite fraction</span>
+            <span class="info-tooltip" tabindex="0" aria-label="Automatic FunSearch elite fraction help">
+              i
+              <span class="tooltip-panel">
+                Fraction of the population treated as elite parents each iteration.
+              </span>
+            </span>
+          </span>
+          <input type="number" min="0" max="1" step="0.01" name="elite_fraction" value="{{ unsupervised_launch_values.elite_fraction or '' }}" placeholder="0.25" data-funsearch-template-field="elite_fraction">
+        </label>
+        <label>
+          <span class="label-with-info">
+            <span>Children per elite</span>
+            <span class="info-tooltip" tabindex="0" aria-label="Automatic FunSearch children per elite help">
+              i
+              <span class="tooltip-panel">
+                Number of mutated children generated from each elite parent in one iteration.
+              </span>
+            </span>
+          </span>
+          <input type="number" min="0" name="children_per_elite" value="{{ unsupervised_launch_values.children_per_elite or '' }}" placeholder="2" data-funsearch-template-field="children_per_elite">
+        </label>
+        <label>
+          <span class="label-with-info">
+            <span>Crossover rate</span>
+            <span class="info-tooltip" tabindex="0" aria-label="Automatic FunSearch crossover rate help">
+              i
+              <span class="tooltip-panel">
+                Probability that a child is generated by crossover between two parents instead of single-parent mutation.
+              </span>
+            </span>
+          </span>
+          <input type="number" min="0" max="1" step="0.01" name="crossover_rate" value="{{ unsupervised_launch_values.crossover_rate or '' }}" placeholder="1.0">
+        </label>
+          </div>
+          <p class="metric-subtle">This always learns on the train split and reports held-out validation curves from the validation split.</p>
+          <div class="button-row launch-button-row">
+            <button class="primary-button" type="submit" name="launch_mode" value="run_now" {% if not supervised_library_options %}disabled{% endif %}>Run now</button>
+            <button class="secondary-button" type="submit" name="launch_mode" value="queue" {% if not supervised_library_options %}disabled{% endif %}>Queue</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="env-activity-column">
+        <div class="section-label">Active and recent</div>
+        {% set automatic_live_jobs = namespace(count=0) %}
+        {% set automatic_failed_jobs = namespace(count=0) %}
+        <div class="metric-stack compact-metrics env-job-scrollbox">
+      {% for job in environment_jobs %}
+        {% if job.metadata.get("workflow_kind") == "automatic" and job.status in ["queued", "running", "paused"] %}
+        {% set automatic_live_jobs.count = automatic_live_jobs.count + 1 %}
+        <div class="metric-row compact-row">
+          <div class="metric-main">
+            <div class="metric-title"><a href="{{ job.learning_progress.run_url if job.learning_progress else '/jobs/' ~ job.job_id }}">{{ job.display_name }}</a></div>
+            <div class="metric-subtle">{{ display_time(job.created_at) }} · {{ job.name }}</div>
+            {% include "_learning_job_compact.html" %}
+          </div>
+          <div class="job-inline-actions">
+            <span class="pill status-{{ job.status }}">{{ job.status }}</span>
+            {% if job.metadata.get("supports_pause") and job.status in ["queued", "running"] %}
+            <form method="post" action="/jobs/{{ job.job_id }}/pause">
+              <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+              <button class="secondary-button" type="submit">Pause</button>
+            </form>
+            {% elif job.status == "paused" %}
+            <form method="post" action="/jobs/{{ job.job_id }}/resume">
+              <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+              <button class="secondary-button" type="submit">Unpause</button>
+            </form>
+            <form method="post" action="/jobs/{{ job.job_id }}/exit">
+              <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+              <button class="secondary-button danger-button" type="submit">Exit</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+      {% if automatic_live_jobs.count == 0 %}
+      <p class="empty inline">No active automatic jobs.</p>
+      {% endif %}
+      {% for job in environment_jobs %}
+        {% if job.metadata.get("workflow_kind") == "automatic" and job.status == "failed" %}
+        {% if automatic_failed_jobs.count == 0 %}
+      <div class="section-label compact-section-label">Recent failed jobs</div>
+        {% endif %}
+        {% set automatic_failed_jobs.count = automatic_failed_jobs.count + 1 %}
+        <div class="metric-row compact-row">
+          <div class="metric-main">
+            <div class="metric-title"><a href="{{ job.learning_progress.run_url if job.learning_progress else '/jobs/' ~ job.job_id }}">{{ job.display_name }}</a></div>
+            <div class="metric-subtle">{{ display_time(job.created_at) }} · {{ job.name }}</div>
+            {% include "_learning_job_compact.html" %}
+          </div>
+          <div class="job-inline-actions">
+            <span class="pill status-{{ job.status }}">{{ job.status }}</span>
+            <form method="post" action="/jobs/{{ job.job_id }}/resume">
+              <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+              <button class="secondary-button" type="submit">Resume failed run</button>
+            </form>
+            <form method="post" action="/jobs/{{ job.job_id }}/clear">
+              <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+              <button class="secondary-button danger-button" type="submit">Clear</button>
+            </form>
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+      {% for run in summary.automatic_libraries[:8] %}
+      <div class="metric-row compact-row">
+        <div class="metric-main">
+          <div class="metric-title"><a href="/automatic/{{ summary.env_id }}/{{ run.run_id }}">{{ run.run_id }}</a></div>
+          <div class="metric-subtle">
+            {% if run.source_supervised_run_id %}
+            source <a href="/runs/{{ summary.env_id }}/{{ run.source_supervised_run_id }}">{{ run.source_supervised_run_id }}</a>
+            {% else %}
+            source unknown
+            {% endif %}
+            {% if run.source_evaluation_run_id %} · eval {{ run.source_evaluation_run_id }}{% endif %}
+            {% if run.proposed_labels %} · {{ run.proposed_labels|length }} proposed labels{% endif %}
+          </div>
+        </div>
+        <div class="job-inline-actions">
+          {% set run_status = run.raw_run_payload.get("status") if run.raw_run_payload else none %}
+          {% if run.evaluation_runs %}
+          <span class="score">
+            {{ "%.1f%%"|format(run.evaluation_runs[0].success_ratio * 100) if run.evaluation_runs[0].success_ratio is not none else "saved" }}
+          </span>
+          {% elif run_status == "completed" %}
+          <span class="pill">completed</span>
+          {% elif run_status == "failed" %}
+          <span class="pill">failed</span>
+          {% else %}
+          <span class="pill">learning</span>
+          {% endif %}
+          <form method="post" action="/automatic/{{ summary.env_id }}/{{ run.run_id }}/delete" onsubmit="return confirm('Delete automatic run {{ run.run_id }}? This removes the combined-library record and evaluations.');">
+            <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+            <button class="secondary-button danger-button" type="submit">Delete</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+      {% if automatic_active.count == 0 and not summary.automatic_libraries %}
+      <p class="empty inline">No automatic runs yet.</p>
+      {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel tool-row">
+    <div class="card-topline">
+      <div>
+        <h2>3. Unsupervised learning run</h2>
+        <p class="metric-subtle">Suggest labels directly from trace images only, reduce them to a final set, then learn and auto-evaluate the resulting library just like a supervised run.</p>
+      </div>
+      <span class="pill">{{ unsupervised_active.count }} active</span>
+    </div>
+    {% if true_unsupervised_launch_error %}
+    <p class="form-error">Unsupervised launch invalid: {{ true_unsupervised_launch_error }}</p>
+    {% endif %}
+    <div class="env-section-grid">
+      <div class="env-launch-column">
+        <div class="section-label">Launch</div>
+        <form class="launch-form" method="post" action="/env/{{ summary.env_id }}/unsupervised/launch" data-funsearch-form data-funsearch-templates='{{ funsearch_templates|tojson }}'>
+          <div class="form-grid compact-form-grid">
+            <label>
+              Dataset
+              <select name="dataset_name" {% if not learning_dataset_options %}disabled{% endif %}>
+                {% if not learning_dataset_options %}
+                  <option value="" selected>No available datasets</option>
+                {% endif %}
+                {% for option in learning_dataset_options %}
+                  <option value="{{ option.dataset_name }}" {% if true_unsupervised_launch_values.dataset_name == option.dataset_name %}selected{% endif %}>{{ option.dataset_name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span>Trace count</span>
+              <input type="number" min="1" name="trace_count" value="{{ true_unsupervised_launch_values.trace_count or '10' }}">
+            </label>
+            <label>
+              <span>Labels per trace</span>
+              <input type="number" min="1" name="labels_per_trace" value="{{ true_unsupervised_launch_values.labels_per_trace or '10' }}">
+            </label>
+            <label>
+              <span>Final labels</span>
+              <input type="number" min="1" name="final_label_count" value="{{ true_unsupervised_launch_values.final_label_count or '10' }}">
+            </label>
+            <label>
+              <span>LM name</span>
+              <input type="text" name="model" value="{{ true_unsupervised_launch_values.model or '' }}" placeholder="blank string default">
+            </label>
+            <label>
+              <span>Template</span>
+              <select name="funsearch_template" data-funsearch-template-select>
+                {% for template_name, template in funsearch_templates.items() %}
+                  <option value="{{ template_name }}" {% if true_unsupervised_launch_values.funsearch_template == template_name %}selected{% endif %}>{{ template.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span>Iterations</span>
+              <input type="number" min="1" name="iteration_count" value="{{ true_unsupervised_launch_values.iteration_count or '1' }}" data-funsearch-template-field="iteration_count">
+            </label>
+            <label>
+              <span>Workers</span>
+              <input type="number" min="1" name="workers" value="{{ true_unsupervised_launch_values.workers or '1' }}">
+            </label>
+            <label>
+              <span>Seed</span>
+              <input type="number" name="seed" value="{{ true_unsupervised_launch_values.seed or '' }}" placeholder="42">
+            </label>
+            <label>
+              <span>Population</span>
+              <input type="number" min="1" name="population_size" value="{{ true_unsupervised_launch_values.population_size or '' }}" placeholder="12" data-funsearch-template-field="population_size">
+            </label>
+            <label>
+              <span>Elite fraction</span>
+              <input type="number" min="0" max="1" step="0.01" name="elite_fraction" value="{{ true_unsupervised_launch_values.elite_fraction or '' }}" placeholder="0.25" data-funsearch-template-field="elite_fraction">
+            </label>
+            <label>
+              <span>Children per elite</span>
+              <input type="number" min="0" name="children_per_elite" value="{{ true_unsupervised_launch_values.children_per_elite or '' }}" placeholder="2" data-funsearch-template-field="children_per_elite">
+            </label>
+            <label>
+              <span>Crossover rate</span>
+              <input type="number" min="0" max="1" step="0.01" name="crossover_rate" value="{{ true_unsupervised_launch_values.crossover_rate or '' }}" placeholder="1.0">
+            </label>
+          </div>
+          <p class="metric-subtle">This samples trace images from the train split, proposes labels without any library, then learns on train and reports validation curves from the validation split.</p>
+          <div class="button-row launch-button-row">
+            <button class="primary-button" type="submit" name="launch_mode" value="run_now" {% if not learning_dataset_options %}disabled{% endif %}>Run now</button>
+            <button class="secondary-button" type="submit" name="launch_mode" value="queue" {% if not learning_dataset_options %}disabled{% endif %}>Queue</button>
+          </div>
+        </form>
+      </div>
+      <div class="env-activity-column">
+        <div class="section-label">Active and recent</div>
+        {% set true_unsupervised_live_jobs = namespace(count=0) %}
+        <div class="metric-stack compact-metrics env-job-scrollbox">
+          {% for job in environment_jobs %}
+            {% if job.metadata.get("workflow_kind") == "unsupervised" and job.status in ["queued", "running", "paused"] %}
+            {% set true_unsupervised_live_jobs.count = true_unsupervised_live_jobs.count + 1 %}
+            <div class="metric-row compact-row">
+              <div class="metric-main">
+                <div class="metric-title"><a href="{{ job.learning_progress.run_url if job.learning_progress else '/jobs/' ~ job.job_id }}">{{ job.display_name }}</a></div>
+                <div class="metric-subtle">{{ display_time(job.created_at) }} · {{ job.name }}</div>
+                {% include "_learning_job_compact.html" %}
+              </div>
+              <div class="job-inline-actions">
+                <span class="pill status-{{ job.status }}">{{ job.status }}</span>
+              </div>
+            </div>
+            {% endif %}
+          {% endfor %}
+          {% if true_unsupervised_live_jobs.count == 0 %}
+          <p class="empty inline">No active unsupervised jobs.</p>
+          {% endif %}
+          {% for run in summary.unsupervised_libraries[:8] %}
+          <div class="metric-row compact-row">
+            <div class="metric-main">
+              <div class="metric-title"><a href="/unsupervised/{{ summary.env_id }}/{{ run.run_id }}">{{ run.run_id }}</a></div>
+              <div class="metric-subtle">
+                {% if run.proposed_labels %}{{ run.proposed_labels|length }} labels{% endif %}
+                {% if run.evaluation_runs %} · {{ run.evaluation_runs|length }} evals{% endif %}
+              </div>
+            </div>
+            <div class="job-inline-actions">
+              {% set run_status = run.raw_run_payload.get("status") if run.raw_run_payload else none %}
+              {% if run.evaluation_runs %}
+              <span class="score">
+                {{ "%.1f%%"|format(run.evaluation_runs[0].success_ratio * 100) if run.evaluation_runs[0].success_ratio is not none else "saved" }}
+              </span>
+              {% elif run_status == "completed" %}
+              <span class="pill">completed</span>
+              {% elif run_status == "failed" %}
+              <span class="pill">failed</span>
+              {% else %}
+              <span class="pill">learning</span>
+              {% endif %}
+              <form method="post" action="/unsupervised/{{ summary.env_id }}/{{ run.run_id }}/delete" onsubmit="return confirm('Delete unsupervised run {{ run.run_id }}?');">
+                <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+                <button class="secondary-button danger-button" type="submit">Delete</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+          {% if unsupervised_active.count == 0 and not summary.unsupervised_libraries %}
+          <p class="empty inline">No unsupervised runs yet.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel tool-row">
+    <div class="card-topline">
+      <div>
+        <h2>4. Target labels</h2>
+        <p class="metric-subtle">Edit the label set used by supervised learning for this environment.</p>
+      </div>
+      <span class="pill">{{ summary.target_labels.label_count if summary.target_labels else 0 }} labels</span>
+    </div>
+    {% if label_error %}
+    <p class="form-error">{{ label_error }}</p>
+    {% endif %}
+    {% if label_success %}
+    <p class="form-success">{{ label_success }}</p>
+    {% endif %}
+    <form class="launch-form" method="post" action="/env/{{ summary.env_id }}/labels">
+      <label class="textarea-label">
+        Labels
+        <textarea name="labels_text" rows="8" class="form-textarea" spellcheck="false">{{ label_values.labels_text or '' }}</textarea>
+      </label>
+      <button class="primary-button" type="submit">Save labels</button>
+    </form>
+    {% if summary.target_labels and summary.target_labels.labels %}
+    <div class="chip-row">
+      {% for label in summary.target_labels.labels %}
+      <span class="pill">{{ label }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="panel tool-row workspace-panel workspace-panel-full">
+    <div class="card-topline">
+      <div>
+        <h2>4. Dataset generation</h2>
+        <p class="metric-subtle">Build or resume the environment dataset in place. The dashboard always generates train, validation, and test together.</p>
+      </div>
+      <span class="pill">{{ dataset_active.count }} active</span>
+    </div>
+    {% if dataset_launch_error %}
+    <p class="form-error">Dataset request invalid: {{ dataset_launch_error }}</p>
+    {% endif %}
+    <div class="env-section-grid env-dataset-grid">
+      <div class="env-launch-column">
+        <div class="section-label">Build</div>
+        <form class="launch-form" method="post" action="/env/{{ summary.env_id }}/datasets/build">
+          <div class="form-grid compact-form-grid">
+        <label>
+          Dataset name
+          <input type="text" name="dataset_name" value="{{ dataset_launch_values.dataset_name or '' }}" placeholder="default_simulator_trace_dataset">
+        </label>
+        <label>
+          Train samples
+          <input type="number" min="1" name="train_count" value="{{ dataset_launch_values.train_count or '1000' }}">
+        </label>
+        <label>
+          Validation samples
+          <input type="number" min="1" name="validation_count" value="{{ dataset_launch_values.validation_count or '100' }}">
+        </label>
+        <label>
+          Test samples
+          <input type="number" min="1" name="test_count" value="{{ dataset_launch_values.test_count or '100' }}">
+        </label>
+        <label>
+          Train offset
+          <input type="number" min="0" name="train_offset" value="{{ dataset_launch_values.train_offset or '0' }}">
+        </label>
+        <label>
+          Validation offset
+          <input type="number" min="0" name="validation_offset" value="{{ dataset_launch_values.validation_offset or '500000' }}">
+        </label>
+        <label>
+          Test offset
+          <input type="number" min="0" name="test_offset" value="{{ dataset_launch_values.test_offset or '1000000' }}">
+        </label>
+          </div>
+          <label class="checkbox-row">
+            <input type="checkbox" name="force" value="1" {% if dataset_launch_values.force %}checked{% endif %}>
+            <span>Force rebuild existing samples</span>
+          </label>
+          <button class="primary-button" type="submit">Launch dataset build</button>
+        </form>
+      </div>
+
+      <div class="env-activity-column env-dataset-activity">
+        <div class="section-label">Jobs</div>
+        <div class="metric-stack compact-metrics">
+      {% for job in recent_dataset_jobs[:6] %}
+      <div class="metric-row compact-row">
+        <div class="metric-main">
+          <div class="metric-title"><a href="/jobs/{{ job.job_id }}">{{ job.name }}</a></div>
+          <div class="metric-subtle">{{ display_time(job.created_at) }}</div>
+        </div>
+        <div class="job-inline-actions">
+          <span class="pill status-{{ job.status }}">{{ job.status }}</span>
+          {% if job.status in ["queued", "running"] %}
+          <form method="post" action="/jobs/{{ job.job_id }}/pause">
+            <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+            <button class="secondary-button" type="submit">Pause</button>
+          </form>
+          {% elif job.status == "paused" %}
+          <form method="post" action="/jobs/{{ job.job_id }}/resume">
+            <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+            <button class="secondary-button" type="submit">Unpause</button>
+          </form>
+          <form method="post" action="/jobs/{{ job.job_id }}/exit">
+            <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+            <button class="secondary-button danger-button" type="submit">Exit</button>
+          </form>
+          {% elif job.status == "failed" %}
+          <form method="post" action="/jobs/{{ job.job_id }}/clear">
+            <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+            <button class="secondary-button danger-button" type="submit">Clear</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      {% if not recent_dataset_jobs %}
+      <p class="empty inline">No dataset jobs yet.</p>
+      {% endif %}
+        </div>
+
+        <div class="section-label">Datasets</div>
+        <div class="metric-stack compact-metrics">
+      {% for dataset in summary.datasets %}
+      {% set namespace = namespace(target=0) %}
+      {% for split in dataset.splits %}
+        {% if split.target_count is not none %}
+          {% set namespace.target = namespace.target + split.target_count %}
+        {% endif %}
+      {% endfor %}
+      <div class="metric-row compact-row">
+        <div class="metric-main">
+          <div class="metric-title"><a href="/env/{{ summary.env_id }}/datasets/{{ dataset.dataset_name }}">{{ dataset.dataset_name }}</a></div>
+          <div class="metric-subtle">{{ dataset.total_completed_count }} completed{% if namespace.target > 0 %} / {{ namespace.target }}{% endif %}</div>
+        </div>
+        <div class="job-inline-actions">
+          <span class="pill">{{ dataset.splits|length }} splits</span>
+          <form method="post" action="/env/{{ summary.env_id }}/datasets/{{ dataset.dataset_name }}/delete" onsubmit="return confirm('Delete dataset {{ dataset.dataset_name }}? This removes all saved samples and manifests.');">
+            <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+            <button class="secondary-button danger-button" type="submit">Delete</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not summary.datasets %}
+      <p class="empty inline">No datasets found.</p>
+      {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+</section>
+<script>
+  (() => {
+    const fieldNames = [
+      "iteration_count",
+      "population_size",
+      "elite_fraction",
+      "children_per_elite",
+    ];
+
+    document.querySelectorAll("[data-funsearch-form]").forEach((form) => {
+      const select = form.querySelector("[data-funsearch-template-select]");
+      if (!select) {
+        return;
+      }
+
+      let templates = {};
+      try {
+        templates = JSON.parse(form.dataset.funsearchTemplates || "{}");
+      } catch (_error) {
+        templates = {};
+      }
+
+      function applyTemplate(templateName) {
+        const template = templates[templateName];
+        if (!template) {
+          return;
+        }
+        fieldNames.forEach((fieldName) => {
+          const input = form.querySelector(
+            `[data-funsearch-template-field="${fieldName}"]`,
+          );
+          if (!input || !(fieldName in template)) {
+            return;
+          }
+          input.value = template[fieldName];
+        });
+      }
+
+      select.addEventListener("change", () => {
+        applyTemplate(select.value);
+      });
+    });
+  })();
+</script>
+{% endblock %}

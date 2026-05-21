@@ -1,0 +1,12 @@
+[submodule "deps/evolutionary-programming-algorithms"]
+	path = deps/evolutionary-programming-algorithms
+	url = https://github.com/SeanMemery/evolutionary-programming-algorithms.git
+	branch = main
+[submodule "deps/pattern_library"]
+	path = deps/pattern_library
+	url = https://github.com/SeanMemery/pattern_library.git
+	branch = main
+[submodule "deps/public_connection"]
+	path = deps/public_connection
+	url = https://github.com/SeanMemery/client_server_connection.git
+	branch = main

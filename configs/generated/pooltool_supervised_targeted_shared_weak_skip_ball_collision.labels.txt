@@ -1,0 +1,7 @@
+rolling ball
+sliding ball
+spinning ball
+ball slowing
+ball separation
+high angle collision
+gentle touch

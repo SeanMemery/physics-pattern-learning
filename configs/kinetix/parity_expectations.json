@@ -1,0 +1,17 @@
+{
+  "expectations_version": "1",
+  "fixtures": [
+    {
+      "env_id": "kinetix",
+      "task_id": "fixture-kinetix",
+      "expected_outcome": {
+        "task_name": "distance_to_goal",
+        "success": true,
+        "terminal_status": "task_completed"
+      },
+      "expected_metrics": {
+        "final_reward": 1.5
+      }
+    }
+  ]
+}

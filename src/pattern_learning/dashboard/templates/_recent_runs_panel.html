@@ -1,0 +1,68 @@
+{% if recent_runs %}
+<div class="recent-run-archive">
+  {% for item in recent_runs %}
+  {% set run_status = item.display_status %}
+  <article class="recent-run-card">
+    <div class="recent-run-main">
+      <div class="recent-run-identity">
+        {% if item.job %}
+        <div class="metric-title"><a href="/jobs/{{ item.job.job_id }}">{{ item.display_name }}</a></div>
+        <div class="metric-subtle recent-run-subtitle">{{ item.env_id }} · {{ "automatic" if item.kind == "automatic" else item.kind }} job</div>
+        <div class="metric-subtle recent-run-meta">
+          {{ item.job.name }}
+          {% if item.job.metadata.get("queue_wait_reason") %}
+          · {{ item.job.metadata.get("queue_wait_reason") }}
+          {% endif %}
+        </div>
+        {% else %}
+        {% set run = item.run %}
+        {% set latest_eval = item.latest_eval %}
+        {% if item.kind == "supervised" %}
+          {% set run_url = "/runs/" ~ item.env_id ~ "/" ~ run.run_id %}
+        {% elif item.kind == "automatic" %}
+          {% set run_url = "/automatic/" ~ item.env_id ~ "/" ~ run.run_id %}
+        {% else %}
+          {% set run_url = "/unsupervised/" ~ item.env_id ~ "/" ~ run.run_id %}
+        {% endif %}
+        <div class="metric-title"><a href="{{ run_url }}">{{ run.run_id }}</a></div>
+        <div class="metric-subtle recent-run-subtitle">
+          {{ item.env_id }} · {{ "automatic" if item.kind == "automatic" else item.kind }}
+          {% if item.kind == "supervised" and run.average_score is not none %}
+          · reward {{ "%.3f"|format(run.average_score) }}
+          {% endif %}
+        </div>
+        <div class="metric-subtle recent-run-meta">
+          {% if item.kind == "supervised" %}
+          {{ run.label_count }} labels · {{ run.candidate_count }} candidates
+          {% else %}
+          {{ run.learned_label_count }} learned · {{ run.proposed_labels|length }} proposed
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+      <div class="recent-run-eval">
+        <span class="summary-label">Eval</span>
+        <strong class="recent-run-eval-value">
+          {% if item.job %}
+          —
+          {% else %}
+          {% set latest_eval = item.latest_eval %}
+          {{ "%.1f%%"|format(latest_eval.success_ratio * 100) if latest_eval and latest_eval.success_ratio is not none else "—" }}
+          {% endif %}
+        </strong>
+      </div>
+    </div>
+    <div class="recent-run-foot">
+      <span class="pill run-kind-{{ item.kind }}">{{ item.kind }}</span>
+      <div class="recent-run-head-actions">
+        {% if run_status %}
+        <span class="pill status-{{ run_status }}">{{ run_status }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<p class="empty">No finished, failed, interrupted, or paused runs yet.</p>
+{% endif %}

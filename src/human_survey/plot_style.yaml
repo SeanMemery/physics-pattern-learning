@@ -1,0 +1,62 @@
+rcParams:
+  font.size: 9
+  axes.titlesize: 9
+  axes.labelsize: 9
+  xtick.labelsize: 8
+  ytick.labelsize: 8
+  legend.fontsize: 6
+  lines.linewidth: 1
+  lines.markersize: 1.5
+  errorbar.capsize: 1
+  font.family: "serif"
+  font.serif: ["Linux Libertine O", "Libertine", "Libertinus Serif", "Times New Roman", "Times"]
+  mathtext.fontset: "custom"
+  mathtext.rm: "Linux Libertine O"
+  mathtext.it: "Linux Libertine O:italic"
+  mathtext.bf: "Linux Libertine O:bold"
+
+style: "seaborn-v0_8-whitegrid"
+error_type: "sem"
+
+colors:
+  - "#d15d08"
+  - "#0474b4"
+  - "#c783a6"
+  - "#2ca02c"
+  - "#9467bd"
+  - "#17becf"
+
+aesthetics:
+  figure:
+    facecolor: "white"
+    dpi: 800
+  grid:
+    linestyle: "-"
+    linewidth: 0.25
+    alpha: 0.2
+    color: "#bbbbbb"
+  errorbar:
+    capsize: 1
+    linewidth: 0.25
+    alpha: 0.3
+    ecolor: "#666666"
+  error_region:
+    alpha: 0.15
+  legend:
+    frameon: true
+    facecolor: "white"
+    framealpha: 1.0
+    shadow: false
+    fancybox: true
+
+markers:
+  scatter: ["o", "s", "D", "^", "v", ">", "<", "p", "h"]
+
+labels:
+  padding: 10
+  title_padding: 20
+
+figure_sizes:
+  default: [3.3, 2.2]
+  tall: [3.3, 4.4]
+  wide: [6.6, 2.2]

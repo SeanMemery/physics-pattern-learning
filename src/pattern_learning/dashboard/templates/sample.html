@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ summary.env_id }}">{{ summary.env_id }}</a> / <a href="/env/{{ summary.env_id }}/datasets/{{ summary.dataset_name }}">{{ summary.dataset_name }}</a> / {{ summary.sample_name }}</p>
+  <h1>{{ summary.sample_name }}</h1>
+  <p>Sample metadata and any available stored preview artifacts.</p>
+</section>
+
+<section class="content-grid">
+  <section class="panel">
+    <h2>Sample metadata</h2>
+    <div class="metric-stack">
+      <div class="metric-row"><span>Environment</span><strong>{{ summary.env_id }}</strong></div>
+      <div class="metric-row"><span>Dataset</span><strong>{{ summary.dataset_name }}</strong></div>
+      <div class="metric-row"><span>Split</span><strong>{{ summary.split_name }}</strong></div>
+      <div class="metric-row"><span>Sample</span><strong>{{ summary.sample_name }}</strong></div>
+      <div class="metric-row"><span>Trace</span><strong class="truncate">{{ summary.trace_path if summary.trace_path else "missing" }}</strong></div>
+      <div class="metric-row"><span>Quality</span><strong class="truncate">{{ summary.quality_path if summary.quality_path else "missing" }}</strong></div>
+      <div class="metric-row"><span>Media available</span><strong>{{ "yes" if summary.has_media else "no" }}</strong></div>
+    </div>
+  </section>
+</section>
+
+<section class="panel">
+  <h2>Preview media</h2>
+
+  {% for scene_image_path in summary.scene_image_paths %}
+  <div class="preview-block">
+    <div class="card-topline">
+      <h3>Initial scene{% if scene_image_path.name != "initial_scene.png" %} · {{ scene_image_path.stem }}{% endif %}</h3>
+      <a href="/env/{{ summary.env_id }}/datasets/{{ summary.dataset_name }}/{{ summary.split_name }}/{{ summary.sample_name }}/media/{{ scene_image_path.name }}">open image</a>
+    </div>
+    <img
+      class="preview-image"
+      src="/env/{{ summary.env_id }}/datasets/{{ summary.dataset_name }}/{{ summary.split_name }}/{{ summary.sample_name }}/media/{{ scene_image_path.name }}"
+      alt="Initial scene preview for {{ summary.sample_name }}"
+      loading="lazy"
+    >
+  </div>
+  {% endfor %}
+
+  {% for simulation_path in summary.simulation_paths %}
+  <div class="preview-block">
+    <div class="card-topline">
+      <h3>Simulation replay{% if simulation_path.name != "simulation.mp4" %} · {{ simulation_path.stem }}{% endif %}</h3>
+      <a href="/env/{{ summary.env_id }}/datasets/{{ summary.dataset_name }}/{{ summary.split_name }}/{{ summary.sample_name }}/media/{{ simulation_path.name }}">open video</a>
+    </div>
+    <video class="preview-video" controls preload="metadata">
+      <source src="/env/{{ summary.env_id }}/datasets/{{ summary.dataset_name }}/{{ summary.split_name }}/{{ summary.sample_name }}/media/{{ simulation_path.name }}" type="video/mp4">
+      Your browser does not support embedded video playback.
+    </video>
+  </div>
+  {% endfor %}
+
+  {% if not summary.has_media %}
+  <p class="empty">No preview media found for this sample.</p>
+  {% endif %}
+</section>
+{% endblock %}

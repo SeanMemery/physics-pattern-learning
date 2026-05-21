@@ -1,0 +1,13 @@
+config_version: "1"
+dataset_name: "standard_1000_100"
+env_ids:
+  - kinetix
+splits:
+  - name: train
+    sample_count: 1000
+    sample_offset: 0
+  - name: test
+    sample_count: 100
+    sample_offset: 1000000
+notes:
+  - "Retained Kinetix-only dataset with bounded-memory worker generation."

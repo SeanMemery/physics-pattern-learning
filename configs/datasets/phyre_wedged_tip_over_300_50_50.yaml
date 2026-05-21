@@ -1,0 +1,16 @@
+config_version: "1"
+dataset_name: "phyre_wedged_tip_over_300_50_50"
+env_ids:
+  - phyre
+splits:
+  - name: train
+    sample_count: 300
+    sample_offset: 0
+  - name: validation
+    sample_count: 50
+    sample_offset: 500000
+  - name: test
+    sample_count: 50
+    sample_offset: 1000000
+notes:
+  - "Focused PHYRE dataset for wedged/tip over supervised learning runs."

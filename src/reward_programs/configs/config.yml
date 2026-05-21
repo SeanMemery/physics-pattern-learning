@@ -1,0 +1,22 @@
+llm:
+  base_url: 
+  model: 
+  timeout_seconds: 
+  api_key_env:
+
+optimization:
+  budgets: [10, 50, 100, 250, 500]
+  scene_count: 10
+  seed_count: 3
+  search_budget: 250
+
+value_model:
+  budgets: [128, 256, 512, 1024]
+  train_scene_count: 64
+  validation_scene_count: 16
+  actions_per_scene: 24
+  validation_candidates: 64
+  hidden_size: 64
+  epochs: 25
+  learning_rate: 0.001
+  batch_size: 32

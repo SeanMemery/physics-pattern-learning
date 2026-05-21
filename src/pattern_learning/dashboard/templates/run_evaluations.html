@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ env_id }}">{{ env_id }}</a> / <a href="/runs/{{ env_id }}/{{ run_id }}">{{ run_id }}</a> / evaluations</p>
+  <h1>{{ env_id }} · {{ run_id }} · DeepPHY evaluations</h1>
+  <p>Launch manual reevaluations, disable labels, and compare saved benchmark results for this supervised library.</p>
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <span class="stat-label">Saved evals</span>
+      <strong class="stat-value">{{ run.evaluation_runs|length }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Latest success</span>
+      <strong class="stat-value">
+        {% if latest_evaluation and latest_evaluation.success_ratio is not none %}
+          {{ "%.1f%%"|format(latest_evaluation.success_ratio * 100) }}
+        {% else %}
+          —
+        {% endif %}
+      </strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Available labels</span>
+      <strong class="stat-value">{{ available_labels|length }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Eval time</span>
+      <strong class="stat-value">
+        {% if latest_evaluation %}
+          {{ format_duration(latest_evaluation.total_duration_seconds) }}
+        {% else %}
+          —
+        {% endif %}
+      </strong>
+    </div>
+  </div>
+</section>
+
+<div class="button-row">
+  <a class="secondary-button" href="/runs/{{ env_id }}/{{ run_id }}">Back to run</a>
+</div>
+
+<section class="content-grid">
+  <section class="panel">
+    <h2>Manual reevaluation</h2>
+    <p class="metric-subtle">Run the configured <code>evaluate-deepphy</code> benchmark for <code>{{ env_id }}</code> against this supervised run.</p>
+    <p class="metric-subtle">{{ benchmark.label }} · {{ benchmark.task_count }} tasks.</p>
+    {% if evaluation_error %}
+      <p class="form-error">{{ evaluation_error }}</p>
+    {% endif %}
+    <form class="launch-form" method="post" action="/runs/{{ env_id }}/{{ run_id }}/evaluations/launch">
+      <div class="form-grid compact-form-grid">
+        <label class="worker-control-card">
+          <span>Workers</span>
+          <input name="workers" value="{{ evaluation_values.workers }}" type="number" min="1" />
+        </label>
+        <label>
+          <span>Preset</span>
+          <select name="benchmark_preset">
+            {% for option in ["full", "quick-eval", "test"] %}
+              <option value="{{ option }}" {% if evaluation_values.benchmark_preset == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span>LM name</span>
+          <input name="model" value="{{ evaluation_values.model or '' }}" type="text" placeholder="blank string default" />
+        </label>
+        <div class="metric-subtle">Reasoned WM prompting is always used for evaluations.</div>
+        <div class="metric-subtle">Attempt visuals are always captured for evaluations.</div>
+      </div>
+      <fieldset class="split-selector compact-selector label-selector-grid">
+        <legend>Labels to use</legend>
+        {% if available_labels %}
+          <div class="evaluation-label-grid">
+            {% for label in available_labels %}
+              <label class="checkbox-row evaluation-label-option">
+                <input type="checkbox" name="enabled_label" value="{{ label }}" {% if label in enabled_labels %}checked{% endif %}>
+                <span>{{ label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty">No library labels were found for this run.</p>
+        {% endif %}
+      </fieldset>
+      <div class="button-row launch-button-row">
+        <button type="submit" class="primary-button" name="launch_mode" value="run_now">Run now</button>
+        <button type="submit" class="secondary-button" name="launch_mode" value="queue">Queue</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Recent evaluation jobs</h2>
+    {% if recent_evaluation_jobs %}
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>Job</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Labels</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for job in recent_evaluation_jobs %}
+          <tr>
+            <td>
+              {% if job.metadata.get("evaluation_run_id") %}
+                <a href="/runs/{{ env_id }}/{{ run_id }}/evaluations/{{ job.metadata.get('evaluation_run_id') }}">{{ job.metadata.get("evaluation_run_id") }}</a>
+                <div class="metric-subtle">{{ job.job_id }}</div>
+              {% else %}
+                <a href="/jobs/{{ job.job_id }}">{{ job.job_id }}</a>
+              {% endif %}
+            </td>
+            <td>
+              {% if job.evaluation_origin == "workflow" %}
+                <span class="mini-chip">auto eval</span>
+              {% else %}
+                <span class="mini-chip">manual eval</span>
+              {% endif %}
+            </td>
+            <td><span class="pill status-{{ job.status }}">{{ job.status }}</span></td>
+            <td>
+              {% set enabled_count = job.metadata.get("enabled_labels", [])|length %}
+              {% set disabled_count = job.metadata.get("disabled_labels", [])|length %}
+              {% if enabled_count or disabled_count %}
+                {{ enabled_count }} on{% if disabled_count %} · {{ disabled_count }} off{% endif %}
+              {% else %}
+                all labels
+              {% endif %}
+            </td>
+            <td>{{ display_time(job.created_at) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">No evaluation jobs launched for this run in this server session.</p>
+    {% endif %}
+  </section>
+</section>
+
+<section class="panel">
+  <h2>Saved evaluations</h2>
+  {% if run.evaluation_runs %}
+    <div class="scroll-table compact-scroll-table">
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th>Status</th>
+            <th>Success</th>
+            <th>Time</th>
+            <th>Prompt</th>
+            <th>Model</th>
+            <th>Performance</th>
+            <th>Labels</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for evaluation in run.evaluation_runs %}
+          <tr>
+            <td><a href="/runs/{{ env_id }}/{{ run_id }}/evaluations/{{ evaluation.run_id }}">{{ evaluation.run_id }}</a></td>
+            <td><span class="pill status-{{ evaluation.status }}">{{ evaluation.status }}</span></td>
+            <td>
+              {% if evaluation.success_ratio is not none %}
+                {{ evaluation.success_count }}/{{ evaluation.task_count }} · {{ "%.1f%%"|format(evaluation.success_ratio * 100) }}
+              {% else %}
+                {{ evaluation.task_count }} seen
+              {% endif %}
+            </td>
+            <td>
+              <div class="evaluation-inline-list">
+                <span class="mini-chip">{{ format_duration(evaluation.total_duration_seconds) }}</span>
+                {% if evaluation.average_task_duration_seconds is not none %}
+                  <span class="mini-chip">{{ format_duration(evaluation.average_task_duration_seconds) }} avg/task</span>
+                {% endif %}
+              </div>
+            </td>
+            <td>{{ evaluation.prompt_format or "—" }}</td>
+            <td class="truncate">{{ evaluation.model_name or "—" }}</td>
+            <td>
+              <div class="evaluation-inline-list">
+                {% for metric in evaluation.metric_summaries[:3] %}
+                  <span class="mini-chip">{{ metric.name }} {{ "%.3f"|format(metric.mean) if metric.mean is not none else "—" }}</span>
+                {% endfor %}
+                {% if not evaluation.metric_summaries %}
+                  <span class="metric-subtle">No numeric metrics</span>
+                {% endif %}
+              </div>
+            </td>
+            <td>
+              <div class="evaluation-inline-list">
+                <span class="mini-chip">{{ evaluation.label_selection.enabled_count }} on</span>
+                {% if evaluation.label_selection.disabled_count %}
+                  <span class="mini-chip">{{ evaluation.label_selection.disabled_count }} off</span>
+                {% endif %}
+                {% for label in evaluation.label_selection.enabled_labels[:2] %}
+                  <span class="mini-chip">{{ label }}</span>
+                {% endfor %}
+                {% if evaluation.label_selection.enabled_count > 2 %}
+                  <span class="mini-chip">+{{ evaluation.label_selection.enabled_count - 2 }}</span>
+                {% endif %}
+              </div>
+            </td>
+            <td>
+              <form method="post" action="/runs/{{ env_id }}/{{ run_id }}/evaluations/{{ evaluation.run_id }}/delete" onsubmit="return confirm('Delete evaluation {{ evaluation.run_id }}?');">
+                <input type="hidden" name="next" value="/runs/{{ env_id }}/{{ run_id }}/evaluations">
+                <button class="secondary-button danger-button" type="submit">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">No evaluations saved for this run yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+{% block content %}
+{% set route_base = run_route_base if run_route_base is defined else '/automatic' %}
+{% set kind_label = run_kind_label if run_kind_label is defined else 'automatic' %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ env_id }}">{{ env_id }}</a> / {{ run_id }}</p>
+  <h1>{{ env_id }} · {{ kind_label }} · {{ run_id }}</h1>
+  <p>{% if kind_label == 'automatic' %}Automatic label proposal, learning, combined-library evaluation, and direct links to the learned detector code.{% else %}Trace-only label proposal, learning, evaluation, and direct links to the learned detector code.{% endif %}</p>
+  {% set latest_eval = run.evaluation_runs[0] if run and run.evaluation_runs else None %}
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <span class="stat-label">Proposed labels</span>
+      <strong class="stat-value">
+        {% if run %}
+          {{ run.proposed_labels|length }}{% if requested_proposed_label_count %}/{{ requested_proposed_label_count }}{% endif %}
+        {% elif requested_proposed_label_count %}
+          0/{{ requested_proposed_label_count }}
+        {% else %}
+          —
+        {% endif %}
+      </strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Sampled traces</span>
+      <strong class="stat-value">{{ run.sampled_reasoning_trace_count if run and run.sampled_reasoning_trace_count is not none else (requested_reasoning_trace_count or "—") }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Detectors</span>
+      <strong class="stat-value">{{ run.detector_count if run and run.detector_count is not none else "—" }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">{% if kind_label == 'automatic' %}Source supervised{% else %}Source traces{% endif %}</span>
+      <strong class="stat-value">{{ source_supervised_run_id or "—" }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Latest evaluation</span>
+      <strong class="stat-value">
+        {% if latest_eval %}
+          <a href="{{ route_base }}/{{ env_id }}/{{ run_id }}/evaluations/{{ latest_eval.run_id }}">
+            {% if latest_eval.success_ratio is not none %}
+              {{ "%.1f%%"|format(latest_eval.success_ratio * 100) }}
+            {% else %}
+              {{ latest_eval.success_count }}/{{ latest_eval.task_count }}
+            {% endif %}
+          </a>
+        {% else %}
+          —
+        {% endif %}
+      </strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">State</span>
+      <strong class="stat-value">{{ (run_job.status if run_job else (run.raw_run_payload.get("status") if run and run.raw_run_payload else "unknown")) or "unknown" }}</strong>
+    </div>
+  </div>
+</section>
+
+<div class="button-row">
+  {% set run_status = run_job.status if run_job else (run.raw_run_payload.get("status") if run and run.raw_run_payload else None) %}
+  {% set can_resume = run_job and (run_job.metadata.get("supports_pause") or run_job.metadata.get("resume_argv")) %}
+  {% if not run_status and run %}
+    {% set run_status = "completed" %}
+  {% endif %}
+  {% set run_status_class = "succeeded" if run_status in ["completed", "succeeded"] else run_status %}
+  {% if run_status %}
+  <span class="pill status-{{ run_status_class }}" id="run-status-chip">{{ run_status }}</span>
+  {% endif %}
+  {% if run_job and run_job.metadata.get("supports_pause") and run_job.status in ["queued", "running"] %}
+  <form method="post" action="/jobs/{{ run_job.job_id }}/pause">
+    <input type="hidden" name="next" value="{{ route_base }}/{{ env_id }}/{{ run_id }}">
+    <button class="secondary-button" type="submit">Pause run</button>
+  </form>
+  {% elif can_resume and run_job.status == "paused" %}
+  <form method="post" action="/jobs/{{ run_job.job_id }}/resume">
+    <input type="hidden" name="next" value="{{ route_base }}/{{ env_id }}/{{ run_id }}">
+    <button class="secondary-button" type="submit">Unpause run</button>
+  </form>
+  {% endif %}
+  {% if run %}
+  <form method="post" action="{{ route_base }}/{{ run.env_id }}/{{ run.run_id }}/delete" onsubmit="return confirm('Delete {{ kind_label }} run {{ run.run_id }}?');">
+    <input type="hidden" name="next" value="/env/{{ run.env_id }}">
+    <button class="secondary-button danger-button" type="submit">Delete run</button>
+  </form>
+  {% endif %}
+</div>
+
+{% if run and run.label_telemetry %}
+  {% with evolution_run=run %}
+    {% include "_library_reward_overview.html" %}
+  {% endwith %}
+{% endif %}
+
+{% if run_job %}
+  {% include "_run_job_panel.html" %}
+{% endif %}
+
+{% if not run %}
+<section class="panel">
+  <h2>Run pending</h2>
+  <p class="empty">This {{ kind_label }} run has been launched, but its saved artifacts are not available yet.</p>
+</section>
+{% else %}
+<section class="workspace-grid">
+  <div class="tool-stack">
+    <section class="panel">
+      <h2>Run summary</h2>
+      <div class="metric-stack">
+        <div class="metric-row"><span>Run id</span><strong>{{ run.run_id }}</strong></div>
+        <div class="metric-row"><span>Environment</span><strong>{{ run.env_id }}</strong></div>
+        <div class="metric-row"><span>Average score</span><strong>{{ "%.3f"|format(run.average_score) if run.average_score is not none else "—" }}</strong></div>
+        <div class="metric-row"><span>Samples</span><strong>{{ run.sample_count if run.sample_count is not none else "—" }}</strong></div>
+        <div class="metric-row"><span>Iterations</span><strong>{{ run.iteration_count if run.iteration_count is not none else "—" }}</strong></div>
+        <div class="metric-row"><span>{% if kind_label == 'automatic' %}Source supervised run{% else %}Dataset manifest{% endif %}</span>
+          <strong>
+            {% if kind_label == 'automatic' and source_supervised_run_id %}
+            <a href="/runs/{{ run.env_id }}/{{ source_supervised_run_id }}">{{ source_supervised_run_id }}</a>
+            {% elif kind_label != 'automatic' %}
+            <span class="truncate">{{ run.raw_run_payload.get("dataset_manifest") if run and run.raw_run_payload else "—" }}</span>
+            {% else %}
+            unknown
+            {% endif %}
+          </strong>
+        </div>
+        <div class="metric-row"><span>{% if kind_label == 'automatic' %}Source evaluation{% else %}Selected traces{% endif %}</span>
+          <strong>
+            {% if kind_label == 'automatic' and source_supervised_run_id and source_evaluation_run_id %}
+            <a href="/runs/{{ run.env_id }}/{{ source_supervised_run_id }}/evaluations/{{ source_evaluation_run_id }}">{{ source_evaluation_run_id }}</a>
+            {% elif kind_label != 'automatic' %}
+            {{ requested_reasoning_trace_count or "—" }}
+            {% else %}
+            —
+            {% endif %}
+          </strong>
+        </div>
+        <div class="metric-row"><span>{% if kind_label == 'automatic' %}Sampled reasoning traces{% else %}Sampled traces{% endif %}</span><strong>{{ run.sampled_reasoning_trace_count if run.sampled_reasoning_trace_count is not none else (requested_reasoning_trace_count or "—") }}</strong></div>
+        <div class="metric-row"><span>{% if kind_label == 'automatic' %}Combined library{% else %}Learned library{% endif %}</span><strong class="truncate">{{ run.combined_library_path if run.combined_library_path else "missing" }}</strong></div>
+        {% if kind_label == 'automatic' %}
+        <div class="metric-row"><span>Automatic library</span><strong class="truncate">{{ run.unsupervised_library_path if run.unsupervised_library_path else "missing" }}</strong></div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Discovery status</h2>
+      <div class="metric-stack">
+        <div class="metric-row">
+          <span>{% if kind_label == 'automatic' %}Reasoning traces sampled{% else %}Trace samples{% endif %}</span>
+          <strong>{{ run.sampled_reasoning_trace_count if run.sampled_reasoning_trace_count is not none else (requested_reasoning_trace_count or "pending") }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Labels proposed</span>
+          <strong>
+            {% if run.proposed_labels %}
+              {{ run.proposed_labels|length }}
+            {% elif requested_proposed_label_count %}
+              pending / {{ requested_proposed_label_count }}
+            {% else %}
+              pending
+            {% endif %}
+          </strong>
+        </div>
+        <div class="metric-row">
+          <span>{{ kind_label|title }} learning</span>
+          <strong>{% if run.label_telemetry %}active{% elif run.unsupervised_library_path or run.combined_library_path %}complete{% else %}pending{% endif %}</strong>
+        </div>
+        {% if kind_label == 'automatic' %}
+        <div class="metric-row">
+          <span>Combined library</span>
+          <strong>{% if run.combined_library_path %}ready{% else %}pending{% endif %}</strong>
+        </div>
+        {% endif %}
+      </div>
+      <h3 class="top-gap">Label proposal</h3>
+      {% if run.proposed_label_details %}
+      <div class="metric-stack">
+        {% for item in run.proposed_label_details %}
+        <div class="metric-row">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.description if item.description else "No description saved." }}</strong>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="empty">Waiting for the LLM to propose {{ kind_label }} labels.</p>
+      {% endif %}
+      <div class="metric-stack top-gap">
+        <div class="metric-row"><span>{% if kind_label == 'automatic' %}Source supervised{% else %}Dataset manifest{% endif %}</span><strong>{% if kind_label == 'automatic' %}{{ source_supervised_run_id or "—" }}{% else %}<span class="truncate">{{ run.raw_run_payload.get("dataset_manifest") if run and run.raw_run_payload else "—" }}</span>{% endif %}</strong></div>
+        <div class="metric-row"><span>{% if kind_label == 'automatic' %}Source evaluation{% else %}Selected traces{% endif %}</span>
+          <strong>
+            {% if kind_label == 'automatic' and source_supervised_run_id and source_evaluation_run_id %}
+            <a href="/runs/{{ run.env_id }}/{{ source_supervised_run_id }}/evaluations/{{ source_evaluation_run_id }}">{{ source_evaluation_run_id }}</a>
+            {% elif kind_label != 'automatic' %}
+            {{ requested_reasoning_trace_count or "—" }}
+            {% else %}
+            —
+            {% endif %}
+          </strong>
+        </div>
+        <div class="metric-row"><span>Sampled traces</span><strong>{{ run.sampled_reasoning_trace_count if run.sampled_reasoning_trace_count is not none else (requested_reasoning_trace_count or "—") }}</strong></div>
+      </div>
+      {% if run.label_proposal_response_text %}
+      <details class="top-gap">
+        <summary>Proposal response</summary>
+        <pre class="code-block">{{ run.label_proposal_response_text }}</pre>
+      </details>
+      {% endif %}
+    </section>
+
+    {% if evaluation_scores_by_model %}
+    <section class="panel">
+      <div class="panel-header-row">
+        <div>
+          <h2>Eval scores by LM</h2>
+          <p class="metric-subtle">Saved combined-library DeepPHY performance for this learned library, grouped by router model name.</p>
+        </div>
+      </div>
+      <div class="scroll-table compact-scroll-table">
+        <table class="data-table compact-table">
+          <thead>
+            <tr>
+              <th>LM</th>
+              <th>Best</th>
+              <th>Latest</th>
+              <th>Evals</th>
+              <th>Best run</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in evaluation_scores_by_model %}
+            <tr>
+              <td class="truncate">{{ row.display_model }}</td>
+              <td>
+                {% if row.best_success_ratio is not none %}
+                  {{ "%.1f%%"|format(row.best_success_ratio * 100) }}
+                  {% if row.best_success_count is not none and row.best_task_count is not none %}
+                    · {{ row.best_success_count }}/{{ row.best_task_count }}
+                  {% endif %}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>
+                {% if row.latest_success_ratio is not none %}
+                  {{ "%.1f%%"|format(row.latest_success_ratio * 100) }}
+                  {% if row.latest_success_count is not none and row.latest_task_count is not none %}
+                    · {{ row.latest_success_count }}/{{ row.latest_task_count }}
+                  {% endif %}
+                {% else %}
+                  {{ row.latest_status or "—" }}
+                {% endif %}
+              </td>
+              <td>{{ row.evaluation_count }}</td>
+              <td>
+                {% if row.best_run_id %}
+                <a href="{{ route_base }}/{{ env_id }}/{{ run.run_id }}/evaluations/{{ row.best_run_id }}">{{ row.best_run_id }}</a>
+                {% else %}
+                —
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% include "_timing_breakdown.html" %}
+  </div>
+
+  {% with llm_call_base_url=route_base ~ '/' ~ env_id ~ '/' ~ run.run_id ~ '/llm-calls' %}
+    {% include "_llm_calls_panel.html" %}
+  {% endwith %}
+</section>
+
+<section class="content-grid">
+
+  <section class="panel">
+    <h2>Benchmark context</h2>
+    <div class="comparison-grid">
+      <div class="comparison-card">
+        <div class="section-label">Source evaluation</div>
+        {% if source_comparison %}
+        <div class="metric-stack">
+          <div class="metric-row"><span>Run</span><strong>{{ source_comparison.run_id }}</strong></div>
+          <div class="metric-row"><span>Successes</span><strong>{{ source_comparison.success_count }}</strong></div>
+          <div class="metric-row"><span>Tasks</span><strong>{{ source_comparison.task_count }}</strong></div>
+          <div class="metric-row"><span>Success ratio</span><strong>{{ "%.1f%%"|format(source_comparison.success_ratio * 100) if source_comparison.success_ratio is not none else "—" }}</strong></div>
+        </div>
+        {% else %}
+        <p class="empty">Source evaluation summary is not available yet.</p>
+        {% endif %}
+      </div>
+      <div class="comparison-card">
+        <div class="section-label">Combined library</div>
+        {% if combined_comparison %}
+        <div class="metric-stack">
+          <div class="metric-row"><span>Run</span><strong>{{ combined_comparison.run_id }}</strong></div>
+          <div class="metric-row"><span>Successes</span><strong>{{ combined_comparison.success_count }}</strong></div>
+          <div class="metric-row"><span>Tasks</span><strong>{{ combined_comparison.task_count }}</strong></div>
+          <div class="metric-row"><span>Success ratio</span><strong>{{ "%.1f%%"|format(combined_comparison.success_ratio * 100) if combined_comparison.success_ratio is not none else "—" }}</strong></div>
+        </div>
+        {% else %}
+        <p class="empty">No combined evaluation saved yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Proposed labels</h2>
+    {% if run.proposed_label_details %}
+    <div class="metric-stack">
+      {% for item in run.proposed_label_details %}
+      <div class="metric-row">
+        <span>{{ item.label }}</span>
+        <strong>{{ item.description if item.description else "No description saved." }}</strong>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">No proposed labels were recorded.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h2>Saved evaluations</h2>
+    {% if run.evaluation_runs %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Run</th>
+          <th>Successes</th>
+          <th>Tasks</th>
+          <th>Success ratio</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for evaluation in run.evaluation_runs %}
+        <tr>
+          <td>
+            <a href="{{ route_base }}/{{ env_id }}/{{ run_id }}/evaluations/{{ evaluation.run_id }}">{{ evaluation.run_id }}</a>
+          </td>
+          <td>{{ evaluation.success_count }}</td>
+          <td>{{ evaluation.task_count }}</td>
+          <td>{{ "%.1f%%"|format(evaluation.success_ratio * 100) if evaluation.success_ratio is not none else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No evaluations saved for this run yet.</p>
+    {% endif %}
+  </section>
+</section>
+{% endif %}
+{% include "_reward_chart_script.html" %}
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ env_id }}">{{ env_id }}</a> / <a href="{{ run_url }}">{{ run_id }}</a> / llm call / {{ call.sequence }}</p>
+  <h1>{{ env_id }} · {{ run_kind }} · {{ run_id }} · LLM call #{{ call.sequence }}</h1>
+  <p>Full request and response details for one recorded FunSearch LLM call.</p>
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <span class="stat-label">Label</span>
+      <strong class="stat-value">{{ call.label or "—" }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Worker</span>
+      <strong class="stat-value">{{ call.worker if call.worker is not none else "—" }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Model</span>
+      <strong class="stat-value">{{ call.model or "—" }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Duration</span>
+      <strong class="stat-value">{{ format_duration(call.duration_seconds) }}</strong>
+    </div>
+  </div>
+</section>
+
+<div class="button-row">
+  <a class="secondary-button" href="{{ run_url }}">Back to run</a>
+</div>
+
+<section class="content-grid">
+  <section class="panel">
+    <h2>Summary</h2>
+    <div class="metric-stack">
+      <div class="metric-row"><span>Sequence</span><strong>{{ call.sequence }}</strong></div>
+      <div class="metric-row"><span>Label</span><strong>{{ call.label or "—" }}</strong></div>
+      <div class="metric-row"><span>Label index</span><strong>{{ call.label_index if call.label_index is not none else "—" }}</strong></div>
+      <div class="metric-row"><span>Worker</span><strong>{{ call.worker if call.worker is not none else "—" }}</strong></div>
+      <div class="metric-row"><span>Model</span><strong>{{ call.model or "—" }}</strong></div>
+      <div class="metric-row"><span>Temperature</span><strong>{{ call.temperature if call.temperature is not none else "—" }}</strong></div>
+      <div class="metric-row"><span>Max tokens</span><strong>{{ call.max_tokens if call.max_tokens is not none else "—" }}</strong></div>
+      <div class="metric-row"><span>Timeout</span><strong>{{ call.timeout_seconds if call.timeout_seconds is not none else "—" }}</strong></div>
+      <div class="metric-row"><span>Finish</span><strong>{{ call.finish_reason or "—" }}</strong></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Output</h2>
+    <pre class="code-block">{{ call.response_text if call.response_text else "—" }}</pre>
+  </section>
+</section>
+
+<section class="panel">
+  <h2>Messages</h2>
+  {% if call.request_messages %}
+    {% for message in call.request_messages %}
+    <div class="llm-message-block">
+      <div class="section-label">{{ message.role or "message" }}</div>
+      <pre class="code-block">{{ message.content if message.content is not none else message|tojson(indent=2) }}</pre>
+    </div>
+    {% endfor %}
+  {% else %}
+  <p class="empty">No request messages recorded.</p>
+  {% endif %}
+</section>
+
+<section class="content-grid">
+  <section class="panel">
+    <h2>Inference settings</h2>
+    <pre class="code-block">{{ call.request_body|tojson(indent=2) }}</pre>
+  </section>
+
+  <section class="panel">
+    <h2>Usage</h2>
+    <pre class="code-block">{{ call.usage|tojson(indent=2) }}</pre>
+  </section>
+</section>
+
+<section class="panel">
+  <h2>Raw response</h2>
+  <pre class="code-block">{{ call.raw_response|tojson(indent=2) }}</pre>
+</section>
+{% endblock %}

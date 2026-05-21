@@ -1,0 +1,17 @@
+{
+  "expectations_version": "1",
+  "fixtures": [
+    {
+      "env_id": "iphyre",
+      "task_id": "fixture-iphyre",
+      "expected_outcome": {
+        "task_name": "reward_threshold",
+        "success": true,
+        "terminal_status": "solved_threshold_reached"
+      },
+      "expected_metrics": {
+        "total_reward": 1000.0
+      }
+    }
+  ]
+}

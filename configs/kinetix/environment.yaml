@@ -1,0 +1,68 @@
+env_id: kinetix
+display_name: Kinetix
+execution_mode: simulator
+upstream:
+  root: .
+  runner: src/adapters/kinetix.py
+  config: src/vendor/deepphy_prompts/configs/env_config_03_kinetix.json
+  assets:
+    - src/vendor/kinetix_suite/levels
+runtime:
+  - kind: python
+    name: Python runtime
+    value: "3.10"
+    interpreter_path: venv/kinetix/bin/python
+    required: true
+  - kind: module
+    name: Gymnax
+    value: gymnax
+    required: true
+  - kind: module
+    name: JAX2D
+    value: jax2d
+    required: true
+  - kind: module
+    name: JAXGL
+    value: jaxgl
+    required: true
+  - kind: directory
+    name: Kinetix levels
+    path: src/vendor/kinetix_suite/levels
+    required: true
+  - kind: file
+    name: Kinetix adapter
+    path: src/adapters/kinetix.py
+    required: true
+  - kind: file
+    name: Kinetix config
+    path: src/vendor/deepphy_prompts/configs/env_config_03_kinetix.json
+    required: true
+native_metric:
+  name: reward_distance_done
+  kind: composite
+  success_field: final_reward/final_done/final_info
+  notes: Native outputs include reward, done status, and distance.
+capabilities:
+  - name: task_inventory
+    status: supported
+    detail: Levels are enumerated from vendored JSON files.
+  - name: direct_simulator_state
+    status: supported
+    detail: Runner has JAX env state access and renderer-backed image export.
+  - name: annotation_modes
+    status: supported
+    detail: Both annotated and unannotated rendering modes exist.
+task_contract:
+  action_space:
+    kind: multi_discrete_control
+    format: joint and thruster action vector
+  observation:
+    kind: pixel_render
+    format: rendered frame history
+  trace:
+    step_unit: environment step
+    attachments:
+      - rendered_frames
+      - annotations
+notes:
+  - The repo vendors 74 Kinetix levels across small, medium, and large sets.

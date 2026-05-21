@@ -1,0 +1,12 @@
+collision
+support contact
+falling object
+swinging object
+object removal
+sliding contact
+airborne motion
+bounce
+chain movement
+spring pull towards
+spring resist movement
+lever launch

@@ -1,0 +1,15 @@
+{% if evolution_run.library_reward_trajectory.series %}
+<section class="panel loss-overview-block top-trajectory-panel">
+  <div class="panel-header-row">
+    <div>
+      <h2>{{ "Validation" if current_reward_metric == "validation" else "Training" }} reward over candidate evaluations</h2>
+      <p class="metric-subtle">Each curve is one label. The x-axis is candidate number for that label: 1st candidate, 2nd candidate, 3rd candidate, and so on. The y-axis is the selected reward metric. Points outside the valid reward range are excluded.</p>
+    </div>
+    <div class="chart-toggle-row">
+      <a class="secondary-button{% if current_reward_metric == 'train' %} is-active{% endif %}" href="{{ reward_metric_toggle.train_url }}">Training reward</a>
+      <a class="secondary-button{% if current_reward_metric == 'validation' %} is-active{% endif %}" href="{{ reward_metric_toggle.validation_url }}">Validation reward</a>
+    </div>
+  </div>
+  {{ render_trajectory_chart(evolution_run.library_reward_trajectory, title=("Validation reward over candidate evaluations by label" if current_reward_metric == "validation" else "Training reward over candidate evaluations by label"), x_label="Candidate number", metric=current_reward_metric) }}
+</section>
+{% endif %}

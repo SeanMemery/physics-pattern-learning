@@ -1,0 +1,411 @@
+<section class="panel">
+  {% set can_resume = run_job.metadata.get("supports_pause") or run_job.metadata.get("resume_argv") %}
+  <div class="panel-header-row run-job-panel-header">
+    <div>
+      <h2>Live learning job</h2>
+      <p class="metric-subtle">Current run state, worker progress, resource peaks, and expandable terminal details.</p>
+    </div>
+    <div class="job-inline-actions run-job-actions">
+      {% if run_job.metadata.get("supports_pause") and run_job.status in ["queued", "running"] %}
+      <form method="post" action="/jobs/{{ run_job.job_id }}/pause">
+        <input type="hidden" name="next" value="{{ run_job.learning_progress.run_url if run_job.learning_progress else '/jobs/' ~ run_job.job_id }}">
+        <button class="secondary-button" type="submit">Pause</button>
+      </form>
+      {% elif can_resume and run_job.status == "paused" %}
+      <form method="post" action="/jobs/{{ run_job.job_id }}/resume">
+        <input type="hidden" name="next" value="{{ run_job.learning_progress.run_url if run_job.learning_progress else '/jobs/' ~ run_job.job_id }}">
+        <button class="secondary-button" type="submit">Unpause</button>
+      </form>
+      <form method="post" action="/jobs/{{ run_job.job_id }}/exit">
+        <input type="hidden" name="next" value="{{ run_job.learning_progress.run_url if run_job.learning_progress else '/jobs/' ~ run_job.job_id }}">
+        <button class="secondary-button danger-button" type="submit">Exit</button>
+      </form>
+      {% elif can_resume and run_job.status == "failed" %}
+      <form method="post" action="/jobs/{{ run_job.job_id }}/resume">
+        <input type="hidden" name="next" value="{{ run_job.learning_progress.run_url if run_job.learning_progress else '/jobs/' ~ run_job.job_id }}">
+        <button class="secondary-button" type="submit">Resume failed run</button>
+      </form>
+      <form method="post" action="/jobs/{{ run_job.job_id }}/clear">
+        <input type="hidden" name="next" value="{{ run_job.learning_progress.run_url if run_job.learning_progress else '/jobs/' ~ run_job.job_id }}">
+        <button class="secondary-button danger-button" type="submit">Clear</button>
+      </form>
+      {% endif %}
+      {% if run_job.metadata.get("queue_requested") and run_job.metadata.get("action") in ["supervised-learn-and-evaluate", "automatic-launch", "unsupervised-launch", "evaluate-deepphy"] and can_resume and run_job.status in ["running", "paused"] %}
+      <form method="post" action="/jobs/{{ run_job.job_id }}/requeue">
+        <input type="hidden" name="next" value="{{ run_job.learning_progress.run_url if run_job.learning_progress else '/jobs/' ~ run_job.job_id }}">
+        <button class="secondary-button" type="submit">Requeue</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="chip-row evolution-settings compact-summary-chips run-job-meta-chips">
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">state</span>
+      <strong class="stat-value stat-value-small" id="run-job-status">{{ run_job.status }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">job</span>
+      <strong class="stat-value stat-value-small monospace-value">{{ run_job.job_id[:8] }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">started</span>
+      <strong class="stat-value stat-value-small" id="run-job-started">{{ display_time(run_job.started_at) }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">finished</span>
+      <strong class="stat-value stat-value-small" id="run-job-finished">{{ display_time(run_job.finished_at) }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">exit</span>
+      <strong class="stat-value stat-value-small" id="run-job-exit">{{ run_job.exit_code if run_job.exit_code is not none else "—" }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">action</span>
+      <strong class="stat-value stat-value-small">{{ run_job.name }}</strong>
+    </div>
+  </div>
+  {% if run_job.resource_metrics %}
+  <div class="chip-row evolution-settings compact-summary-chips">
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">current ram</span>
+      <strong class="stat-value stat-value-small" id="run-job-resource-current-rss">{{ run_job.resource_metrics.current_rss_display }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">peak ram</span>
+      <strong class="stat-value stat-value-small" id="run-job-resource-peak-rss">{{ run_job.resource_metrics.peak_rss_display }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">peak vram</span>
+      <strong class="stat-value stat-value-small" id="run-job-resource-peak-vram">{{ run_job.resource_metrics.peak_gpu_vram_display }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">peak gpu temp</span>
+      <strong class="stat-value stat-value-small" id="run-job-resource-gpu-temp">{{ run_job.resource_metrics.peak_gpu_temp_display }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">low free ram</span>
+      <strong class="stat-value stat-value-small" id="run-job-resource-min-mem">{{ run_job.resource_metrics.min_mem_available_display }}</strong>
+    </div>
+  </div>
+  {% endif %}
+  {% set progress = run_job.learning_progress.progress_summary if run_job.learning_progress and run_job.learning_progress.progress_summary else None %}
+  {% set evaluation = run_job.evaluation_progress if run_job.evaluation_progress else None %}
+  {% if evaluation %}
+  <div class="panel-subheader-row">
+    <div>
+      <h3>DeepPHY evaluation progress</h3>
+      <p class="metric-subtle">This workflow has finished learning and is now running benchmark tasks.</p>
+    </div>
+    <div class="job-inline-actions run-job-actions">
+      {% if evaluation.evaluation_url %}
+      <a class="secondary-button" href="{{ evaluation.evaluation_url }}">Open evaluation</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="chip-row evolution-settings">
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">run</span>
+      <strong class="stat-value stat-value-small" id="run-job-eval-run">{{ evaluation.run_id or "—" }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">tasks</span>
+      <strong class="stat-value stat-value-small" id="run-job-eval-tasks">
+        {% if evaluation.total_tasks %}
+          {{ evaluation.completed_tasks }}/{{ evaluation.total_tasks }}
+        {% else %}
+          {{ evaluation.completed_tasks }} done
+        {% endif %}
+      </strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">success</span>
+      <strong class="stat-value stat-value-small" id="run-job-eval-success">
+        {% if evaluation.success_ratio is not none %}
+          {{ "%.1f%%"|format(evaluation.success_ratio * 100) }}
+        {% else %}
+          {{ evaluation.success_count }}
+        {% endif %}
+      </strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">latest task</span>
+      <strong class="stat-value stat-value-small" id="run-job-eval-latest-task">{{ evaluation.latest_task_id or "—" }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">latest status</span>
+      <strong class="stat-value stat-value-small" id="run-job-eval-latest-status">{{ evaluation.latest_task_status or evaluation.status or "—" }}</strong>
+    </div>
+  </div>
+  {% set eval_progress_width = (evaluation.completed_tasks / evaluation.total_tasks * 100) if evaluation.total_tasks else 0 %}
+  <div class="progress-block">
+    <div class="progress-meta">
+      <span>Completed benchmark tasks</span>
+      <span id="run-job-eval-progress-caption">
+        {% if evaluation.total_tasks %}
+          {{ evaluation.completed_tasks }}/{{ evaluation.total_tasks }}
+        {% else %}
+          {{ evaluation.completed_tasks }} done
+        {% endif %}
+      </span>
+    </div>
+    <div class="progress-track" aria-label="Completed DeepPHY benchmark tasks">
+      <span class="progress-fill" id="run-job-eval-progress-fill" style="width: {{ '%.1f'|format(eval_progress_width) if evaluation.total_tasks else '0.0' }}%"></span>
+    </div>
+  </div>
+  {% else %}
+  <div class="panel-subheader-row">
+    <div>
+      <h3>Search progress</h3>
+      <p class="metric-subtle">Current label search state across workers.</p>
+    </div>
+    <div class="job-inline-actions run-job-actions">
+    {% if worker_update_action %}
+    <form method="post" action="{{ worker_update_action }}" class="inline-worker-form">
+      <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+      <label>
+        <span class="metric-subtle">Target workers</span>
+        <input type="number" min="1" name="workers" value="{{ learning_settings.workers or 1 }}">
+      </label>
+      <button class="secondary-button" type="submit">Apply</button>
+    </form>
+    {% endif %}
+    </div>
+  </div>
+  <div class="chip-row evolution-settings">
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">labels</span>
+      <strong class="stat-value stat-value-small" id="run-job-progress-labels">{% if progress %}{{ progress.completed_labels }}/{{ progress.total_labels }}{% else %}—{% endif %}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">workers</span>
+      <strong class="stat-value stat-value-small" id="run-job-progress-workers">{% if progress and progress.workers %}{{ progress.workers|length }}{% else %}—{% endif %}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">label</span>
+      <strong class="stat-value stat-value-small" id="run-job-progress-label">{{ progress.active_label if progress and progress.active_label else "—" }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">evals</span>
+      <strong class="stat-value stat-value-small" id="run-job-progress-evals">{{ progress.candidate_evaluations if progress and progress.candidate_evaluations is not none else "—" }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">stage</span>
+      <strong class="stat-value stat-value-small" id="run-job-progress-stage">{{ display_learning_stage(progress.stage) if progress and progress.stage else "—" }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">score</span>
+      <strong class="stat-value stat-value-small" id="run-job-progress-score">{{ "%.3f"|format(progress.latest_score) if progress and progress.latest_score is not none else "—" }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">val</span>
+      <strong class="stat-value stat-value-small" id="run-job-progress-val">{{ "%.3f"|format(progress.latest_validation_score) if progress and progress.latest_validation_score is not none else "—" }}</strong>
+    </div>
+  </div>
+  <div class="scroll-table compact-scroll-table run-worker-table-wrap">
+  <table class="data-table compact-table">
+    <thead>
+      <tr>
+        <th>Worker</th>
+        <th>Label</th>
+        <th>Evals</th>
+        <th>Stage</th>
+        <th>Score</th>
+        <th>Val</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="run-job-worker-progress">
+      {% if progress and progress.workers %}
+        {% for worker in progress.workers %}
+        <tr>
+          <td>{{ worker.worker }}</td>
+          <td>{{ worker.label or "—" }}</td>
+          <td>{{ worker.candidate_evaluations if worker.candidate_evaluations is not none else "—" }}</td>
+          <td>{{ display_learning_stage(worker.stage) if worker.stage else "—" }}</td>
+          <td>{{ "%.3f"|format(worker.latest_score) if worker.latest_score is not none else "—" }}</td>
+          <td>{{ "%.3f"|format(worker.latest_validation_score) if worker.latest_validation_score is not none else "—" }}</td>
+          <td>
+            {% if mark_label_done_action and worker.label %}
+            <form method="post" action="{{ mark_label_done_action }}">
+              <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+              <input type="hidden" name="label" value="{{ worker.label }}">
+              <input type="hidden" name="label_index" value="{{ worker.label_index if worker.label_index is not none else '' }}">
+              <button class="secondary-button" type="submit">Mark done</button>
+            </form>
+            {% else %}
+            —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td colspan="7">—</td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+  <details class="job-detail-toggle">
+    <summary>Command</summary>
+    <pre class="code-block run-job-command">{{ run_job.argv | join(' ') }}</pre>
+  </details>
+  <details class="job-detail-toggle">
+    <summary>Recent terminal output</summary>
+    <pre class="log-block" id="run-job-output">{% for line in run_job.recent_output %}{{ line }}
+{% endfor %}</pre>
+  </details>
+  {% if run_job_poll_url %}
+  <p class="metric-subtle">Polling {{ run_job_poll_url }} every 5 seconds while the job is queued or running.</p>
+  <script>
+    (() => {
+      const pollUrl = {{ run_job_poll_url | tojson }};
+      const pollIntervalMs = 5000;
+      const statusEl = document.getElementById("run-job-status");
+      const topStatusChipEl = document.getElementById("run-status-chip");
+      const startedEl = document.getElementById("run-job-started");
+      const finishedEl = document.getElementById("run-job-finished");
+      const exitEl = document.getElementById("run-job-exit");
+      const outputEl = document.getElementById("run-job-output");
+      const labelsEl = document.getElementById("run-job-progress-labels");
+      const workersEl = document.getElementById("run-job-progress-workers");
+      const labelEl = document.getElementById("run-job-progress-label");
+      const evalsEl = document.getElementById("run-job-progress-evals");
+      const stageEl = document.getElementById("run-job-progress-stage");
+      const scoreEl = document.getElementById("run-job-progress-score");
+      const valEl = document.getElementById("run-job-progress-val");
+      const workerTableEl = document.getElementById("run-job-worker-progress");
+      const evalRunEl = document.getElementById("run-job-eval-run");
+      const evalTasksEl = document.getElementById("run-job-eval-tasks");
+      const evalSuccessEl = document.getElementById("run-job-eval-success");
+      const evalLatestTaskEl = document.getElementById("run-job-eval-latest-task");
+      const evalLatestStatusEl = document.getElementById("run-job-eval-latest-status");
+      const evalProgressCaptionEl = document.getElementById("run-job-eval-progress-caption");
+      const evalProgressFillEl = document.getElementById("run-job-eval-progress-fill");
+      const resourceCurrentRssEl = document.getElementById("run-job-resource-current-rss");
+      const resourcePeakRssEl = document.getElementById("run-job-resource-peak-rss");
+      const resourcePeakVramEl = document.getElementById("run-job-resource-peak-vram");
+      const resourceGpuTempEl = document.getElementById("run-job-resource-gpu-temp");
+      const resourceMinMemEl = document.getElementById("run-job-resource-min-mem");
+      let runRefreshToken = {{ run_refresh_token|tojson if run_refresh_token else 'null' }};
+      const markLabelDoneAction = {{ mark_label_done_action|tojson if mark_label_done_action else 'null' }};
+      const workerRowNextUrl = {{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | tojson }};
+
+      function displayLearningStage(value) {
+        if (!value) {
+          return "—";
+        }
+        const mapping = {
+          label: "Starting label",
+          search: "Evaluating",
+          llm: "Writing code",
+          label_done: "Label done",
+          queued: "Queued",
+        };
+        return mapping[value] || String(value).replaceAll("_", " ");
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      async function poll() {
+        try {
+          if (document.hidden) {
+            setTimeout(poll, pollIntervalMs);
+            return;
+          }
+          const response = await fetch(pollUrl, { cache: "no-store" });
+          if (!response.ok) {
+            return;
+          }
+          const job = await response.json();
+          statusEl.textContent = job.status;
+          if (topStatusChipEl) {
+            topStatusChipEl.textContent = job.status;
+            topStatusChipEl.className = `pill status-${job.status === "completed" ? "succeeded" : job.status}`;
+          }
+          startedEl.textContent = job.started_at_display || "—";
+          finishedEl.textContent = job.finished_at_display || "—";
+          exitEl.textContent = job.exit_code === null ? "—" : String(job.exit_code);
+          outputEl.textContent = (job.recent_output || []).join("\n");
+          if (job.resource_metrics) {
+            if (resourceCurrentRssEl) resourceCurrentRssEl.textContent = job.resource_metrics.current_rss_display || "—";
+            if (resourcePeakRssEl) resourcePeakRssEl.textContent = job.resource_metrics.peak_rss_display || "—";
+            if (resourcePeakVramEl) resourcePeakVramEl.textContent = job.resource_metrics.peak_gpu_vram_display || "—";
+            if (resourceGpuTempEl) resourceGpuTempEl.textContent = job.resource_metrics.peak_gpu_temp_display || "—";
+            if (resourceMinMemEl) resourceMinMemEl.textContent = job.resource_metrics.min_mem_available_display || "—";
+          }
+          const progress = job.learning_progress ? job.learning_progress.progress_summary : null;
+          const evaluation = job.evaluation_progress || null;
+          if (progress && labelsEl) {
+            labelsEl.textContent = `${progress.completed_labels}/${progress.total_labels}`;
+            workersEl.textContent = progress.workers && progress.workers.length ? String(progress.workers.length) : "—";
+            labelEl.textContent = progress.active_label || "—";
+            evalsEl.textContent = progress.candidate_evaluations ?? "—";
+            stageEl.textContent = displayLearningStage(progress.stage);
+            scoreEl.textContent = progress.latest_score === null || progress.latest_score === undefined ? "—" : Number(progress.latest_score).toFixed(3);
+            valEl.textContent = progress.latest_validation_score === null || progress.latest_validation_score === undefined ? "—" : Number(progress.latest_validation_score).toFixed(3);
+            if (workerTableEl) {
+              const rows = progress.workers && progress.workers.length
+                ? progress.workers.map((worker) => {
+                    const score = worker.latest_score === null || worker.latest_score === undefined ? "—" : Number(worker.latest_score).toFixed(3);
+                    const val = worker.latest_validation_score === null || worker.latest_validation_score === undefined ? "—" : Number(worker.latest_validation_score).toFixed(3);
+                    const label = worker.label || "—";
+                    const labelIndex = worker.label_index === null || worker.label_index === undefined ? "" : String(worker.label_index);
+                    const action = markLabelDoneAction && worker.label
+                      ? `<form method="post" action="${escapeHtml(markLabelDoneAction)}"><input type="hidden" name="next" value="${escapeHtml(workerRowNextUrl)}"><input type="hidden" name="label" value="${escapeHtml(worker.label)}"><input type="hidden" name="label_index" value="${escapeHtml(labelIndex)}"><button class="secondary-button" type="submit">Mark done</button></form>`
+                      : "—";
+                    return `<tr><td>${worker.worker}</td><td>${escapeHtml(label)}</td><td>${worker.candidate_evaluations ?? "—"}</td><td>${escapeHtml(displayLearningStage(worker.stage))}</td><td>${score}</td><td>${val}</td><td>${action}</td></tr>`;
+                  }).join("")
+                : '<tr><td colspan="7">—</td></tr>';
+              workerTableEl.innerHTML = rows;
+            }
+          }
+          if (evaluation && evalRunEl) {
+            const completedTasks = evaluation.completed_tasks ?? 0;
+            const totalTasks = evaluation.total_tasks ?? null;
+            const taskText = totalTasks ? `${completedTasks}/${totalTasks}` : `${completedTasks} done`;
+            const successText = evaluation.success_ratio === null || evaluation.success_ratio === undefined
+              ? String(evaluation.success_count ?? 0)
+              : `${Number(evaluation.success_ratio * 100).toFixed(1)}%`;
+            evalRunEl.textContent = evaluation.run_id || "—";
+            if (evalTasksEl) evalTasksEl.textContent = taskText;
+            if (evalSuccessEl) evalSuccessEl.textContent = successText;
+            if (evalLatestTaskEl) evalLatestTaskEl.textContent = evaluation.latest_task_id || "—";
+            if (evalLatestStatusEl) evalLatestStatusEl.textContent = evaluation.latest_task_status || evaluation.status || "—";
+            if (evalProgressCaptionEl) evalProgressCaptionEl.textContent = taskText;
+            if (evalProgressFillEl) {
+              const width = totalTasks ? ((completedTasks / totalTasks) * 100).toFixed(1) : "0.0";
+              evalProgressFillEl.style.width = `${width}%`;
+            }
+          } else if (evaluation && !evalRunEl) {
+            window.location.reload();
+            return;
+          }
+          const nextRefreshToken = job.learning_progress ? job.learning_progress.refresh_token : null;
+          if (nextRefreshToken !== runRefreshToken) {
+            window.location.reload();
+            return;
+          }
+          if (job.status === "queued" || job.status === "running") {
+            setTimeout(poll, pollIntervalMs);
+          }
+        } catch (_error) {
+          setTimeout(poll, pollIntervalMs);
+        }
+      }
+
+      if (statusEl.textContent === "queued" || statusEl.textContent === "running") {
+        setTimeout(poll, pollIntervalMs);
+      }
+    })();
+  </script>
+  {% endif %}
+</section>

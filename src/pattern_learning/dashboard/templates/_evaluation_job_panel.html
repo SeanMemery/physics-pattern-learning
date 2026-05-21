@@ -1,0 +1,245 @@
+<section class="panel">
+  {% set can_resume = evaluation_job.metadata.get("supports_pause") or evaluation_job.metadata.get("resume_argv") %}
+  <div class="task-record-header">
+    <div>
+      <h2>Live evaluation job</h2>
+      <p class="metric-subtle">This evaluation page is the live job view for the benchmark run.</p>
+    </div>
+    <div class="evaluation-inline-list">
+      <span class="pill status-{{ evaluation_job.status }}" id="evaluation-job-status-chip">{{ evaluation_job.status }}</span>
+      <span class="mini-chip">{{ evaluation_job.job_id }}</span>
+    </div>
+  </div>
+  <div class="chip-row evolution-settings compact-summary-chips">
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">started</span>
+      <strong class="stat-value stat-value-small" id="evaluation-job-started">{{ display_time(evaluation_job.started_at) }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">finished</span>
+      <strong class="stat-value stat-value-small" id="evaluation-job-finished">{{ display_time(evaluation_job.finished_at) }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">exit</span>
+      <strong class="stat-value stat-value-small" id="evaluation-job-exit">{{ evaluation_job.exit_code if evaluation_job.exit_code is not none else "—" }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">workers</span>
+      <strong class="stat-value stat-value-small">
+        {{ evaluation_job.metadata.get("request", {}).get("workers", 1) }}
+      </strong>
+    </div>
+  </div>
+  {% set evaluation_progress = evaluation_job.evaluation_progress if evaluation_job.evaluation_progress else None %}
+  {% if evaluation_progress %}
+  <div class="chip-row evolution-settings compact-summary-chips">
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">run</span>
+      <strong class="stat-value stat-value-small" id="evaluation-job-progress-run">{{ evaluation_progress.run_id or "—" }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">tasks</span>
+      <strong class="stat-value stat-value-small" id="evaluation-job-progress-tasks">
+        {% if evaluation_progress.total_tasks %}
+          {{ evaluation_progress.completed_tasks }}/{{ evaluation_progress.total_tasks }}
+        {% else %}
+          {{ evaluation_progress.completed_tasks }} done
+        {% endif %}
+      </strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">success</span>
+      <strong class="stat-value stat-value-small" id="evaluation-job-progress-success">
+        {% if evaluation_progress.success_ratio is not none %}
+          {{ "%.1f%%"|format(evaluation_progress.success_ratio * 100) }}
+        {% else %}
+          {{ evaluation_progress.success_count }}
+        {% endif %}
+      </strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">latest task</span>
+      <strong class="stat-value stat-value-small" id="evaluation-job-progress-latest-task">{{ evaluation_progress.latest_task_id or "—" }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">latest status</span>
+      <strong class="stat-value stat-value-small" id="evaluation-job-progress-latest-status">{{ evaluation_progress.latest_task_status or evaluation_progress.status or "—" }}</strong>
+    </div>
+  </div>
+  {% set eval_progress_width = (evaluation_progress.completed_tasks / evaluation_progress.total_tasks * 100) if evaluation_progress.total_tasks else 0 %}
+  <div class="progress-block">
+    <div class="progress-meta">
+      <span>Completed benchmark tasks</span>
+      <span id="evaluation-job-progress-caption">
+        {% if evaluation_progress.total_tasks %}
+          {{ evaluation_progress.completed_tasks }}/{{ evaluation_progress.total_tasks }}
+        {% else %}
+          {{ evaluation_progress.completed_tasks }} done
+        {% endif %}
+      </span>
+    </div>
+    <div class="progress-track" aria-label="Completed evaluation tasks">
+      <span class="progress-fill" id="evaluation-job-progress-fill" style="width: {{ '%.1f'|format(eval_progress_width) if evaluation_progress.total_tasks else '0.0' }}%"></span>
+    </div>
+  </div>
+  {% endif %}
+  <form class="worker-target-form prominent-worker-form" method="post" action="/jobs/{{ evaluation_job.job_id }}/evaluation-workers">
+    <input type="hidden" name="next" value="{{ evaluation_job_next_url }}">
+    <label>
+      <span>Target workers</span>
+      <input type="number" min="1" name="workers" value="{{ evaluation_job.metadata.get('request', {}).get('workers', 1) }}">
+    </label>
+    <button class="primary-button" type="submit">Apply workers</button>
+  </form>
+  <div class="button-row">
+    {% if evaluation_job.status in ["queued", "running"] %}
+    <form method="post" action="/jobs/{{ evaluation_job.job_id }}/pause">
+      <input type="hidden" name="next" value="{{ evaluation_job_next_url }}">
+      <button class="secondary-button" type="submit">Pause</button>
+    </form>
+    {% elif evaluation_job.status == "paused" %}
+  <form method="post" action="/jobs/{{ evaluation_job.job_id }}/resume">
+    <input type="hidden" name="next" value="{{ evaluation_job_next_url }}">
+      <button class="secondary-button" type="submit">Unpause</button>
+    </form>
+    <form method="post" action="/jobs/{{ evaluation_job.job_id }}/exit">
+      <input type="hidden" name="next" value="{{ evaluation_job_next_url }}">
+      <button class="secondary-button danger-button" type="submit">Exit</button>
+    </form>
+    {% elif evaluation_job.status == "failed" %}
+    {% if can_resume %}
+    <form method="post" action="/jobs/{{ evaluation_job.job_id }}/resume">
+      <input type="hidden" name="next" value="{{ evaluation_job_next_url }}">
+      <button class="secondary-button" type="submit">Resume failed evaluation</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/jobs/{{ evaluation_job.job_id }}/clear">
+      <input type="hidden" name="next" value="{{ evaluation_job_next_url }}">
+      <button class="secondary-button danger-button" type="submit">Clear failed job</button>
+    </form>
+    {% elif evaluation_job.status == "succeeded" %}
+    <form method="post" action="/jobs/{{ evaluation_job.job_id }}/clear">
+      <input type="hidden" name="next" value="{{ evaluation_job_next_url }}">
+      <button class="secondary-button" type="submit">Clear completed job</button>
+    </form>
+    {% endif %}
+  </div>
+  {% if evaluation_job.resource_metrics %}
+  <div class="chip-row evolution-settings compact-summary-chips">
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">current ram</span>
+      <strong class="stat-value stat-value-small" id="evaluation-job-resource-current-rss">{{ evaluation_job.resource_metrics.current_rss_display }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">peak ram</span>
+      <strong class="stat-value stat-value-small" id="evaluation-job-resource-peak-rss">{{ evaluation_job.resource_metrics.peak_rss_display }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">peak vram</span>
+      <strong class="stat-value stat-value-small" id="evaluation-job-resource-peak-vram">{{ evaluation_job.resource_metrics.peak_gpu_vram_display }}</strong>
+    </div>
+    <div class="stat-chip evolution-setting-chip">
+      <span class="stat-label">peak gpu temp</span>
+      <strong class="stat-value stat-value-small" id="evaluation-job-resource-gpu-temp">{{ evaluation_job.resource_metrics.peak_gpu_temp_display }}</strong>
+    </div>
+  </div>
+  {% endif %}
+  <details class="annotation-raw">
+    <summary>Command</summary>
+    <pre class="code-block">{{ evaluation_job.argv | join(' ') }}</pre>
+  </details>
+  <pre class="log-block" id="evaluation-job-output">{% for line in evaluation_job.recent_output %}{{ line }}
+{% endfor %}</pre>
+  {% if evaluation_job_poll_url %}
+  <p class="metric-subtle">Polling {{ evaluation_job_poll_url }} every 5 seconds while the job is queued or running.</p>
+  <script>
+    (() => {
+      const pollUrl = {{ evaluation_job_poll_url | tojson }};
+      const pollIntervalMs = 5000;
+      const statusChipEl = document.getElementById("evaluation-job-status-chip");
+      const startedEl = document.getElementById("evaluation-job-started");
+      const finishedEl = document.getElementById("evaluation-job-finished");
+      const exitEl = document.getElementById("evaluation-job-exit");
+      const outputEl = document.getElementById("evaluation-job-output");
+      const topStatusEl = document.getElementById("evaluation-status-chip");
+      const resourceCurrentRssEl = document.getElementById("evaluation-job-resource-current-rss");
+      const resourcePeakRssEl = document.getElementById("evaluation-job-resource-peak-rss");
+      const resourcePeakVramEl = document.getElementById("evaluation-job-resource-peak-vram");
+      const resourceGpuTempEl = document.getElementById("evaluation-job-resource-gpu-temp");
+      const progressRunEl = document.getElementById("evaluation-job-progress-run");
+      const progressTasksEl = document.getElementById("evaluation-job-progress-tasks");
+      const progressSuccessEl = document.getElementById("evaluation-job-progress-success");
+      const progressLatestTaskEl = document.getElementById("evaluation-job-progress-latest-task");
+      const progressLatestStatusEl = document.getElementById("evaluation-job-progress-latest-status");
+      const progressCaptionEl = document.getElementById("evaluation-job-progress-caption");
+      const progressFillEl = document.getElementById("evaluation-job-progress-fill");
+
+      async function poll() {
+        try {
+          if (document.hidden) {
+            setTimeout(poll, pollIntervalMs);
+            return;
+          }
+          const response = await fetch(pollUrl, { cache: "no-store" });
+          if (!response.ok) {
+            return;
+          }
+          const job = await response.json();
+          if (statusChipEl) {
+            statusChipEl.textContent = job.status;
+            statusChipEl.className = `pill status-${job.status}`;
+          }
+          if (topStatusEl) {
+            const normalizedStatus = job.status === "succeeded" ? "completed" : job.status;
+            topStatusEl.textContent = normalizedStatus;
+            topStatusEl.className = `pill status-${normalizedStatus === "completed" ? "succeeded" : normalizedStatus}`;
+          }
+          if (startedEl) startedEl.textContent = job.started_at_display || "—";
+          if (finishedEl) finishedEl.textContent = job.finished_at_display || "—";
+          if (exitEl) exitEl.textContent = job.exit_code === null ? "—" : String(job.exit_code);
+          if (outputEl) outputEl.textContent = (job.recent_output || []).join("\n");
+          if (job.resource_metrics) {
+            if (resourceCurrentRssEl) resourceCurrentRssEl.textContent = job.resource_metrics.current_rss_display || "—";
+            if (resourcePeakRssEl) resourcePeakRssEl.textContent = job.resource_metrics.peak_rss_display || "—";
+            if (resourcePeakVramEl) resourcePeakVramEl.textContent = job.resource_metrics.peak_gpu_vram_display || "—";
+            if (resourceGpuTempEl) resourceGpuTempEl.textContent = job.resource_metrics.peak_gpu_temp_display || "—";
+          }
+          if (job.evaluation_progress && progressRunEl) {
+            const evaluation = job.evaluation_progress;
+            const completedTasks = evaluation.completed_tasks ?? 0;
+            const totalTasks = evaluation.total_tasks ?? null;
+            const taskText = totalTasks ? `${completedTasks}/${totalTasks}` : `${completedTasks} done`;
+            const successText = evaluation.success_ratio === null || evaluation.success_ratio === undefined
+              ? String(evaluation.success_count ?? 0)
+              : `${Number(evaluation.success_ratio * 100).toFixed(1)}%`;
+            progressRunEl.textContent = evaluation.run_id || "—";
+            if (progressTasksEl) progressTasksEl.textContent = taskText;
+            if (progressSuccessEl) progressSuccessEl.textContent = successText;
+            if (progressLatestTaskEl) progressLatestTaskEl.textContent = evaluation.latest_task_id || "—";
+            if (progressLatestStatusEl) progressLatestStatusEl.textContent = evaluation.latest_task_status || evaluation.status || "—";
+            if (progressCaptionEl) progressCaptionEl.textContent = taskText;
+            if (progressFillEl) {
+              const width = totalTasks ? ((completedTasks / totalTasks) * 100).toFixed(1) : "0.0";
+              progressFillEl.style.width = `${width}%`;
+            }
+          } else if (job.evaluation_progress && !progressRunEl) {
+            window.location.reload();
+            return;
+          }
+          if (job.status === "queued" || job.status === "running") {
+            setTimeout(poll, pollIntervalMs);
+          } else {
+            window.location.reload();
+          }
+        } catch (_error) {
+          setTimeout(poll, pollIntervalMs);
+        }
+      }
+
+      if (statusChipEl && (statusChipEl.textContent === "queued" || statusChipEl.textContent === "running")) {
+        setTimeout(poll, pollIntervalMs);
+      }
+    })();
+  </script>
+  {% endif %}
+</section>

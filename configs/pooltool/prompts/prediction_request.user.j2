@@ -1,0 +1,10 @@
+Environment: {{ environment_id }}
+Task: {{ task_id }}
+Task context: {{ task_context_json }}
+Observed cutoff: index={{ cutoff_index }}, t={{ cutoff_t }}, fraction={{ cutoff_fraction }}
+Observed timesteps: {{ observed_timestep_count }} / {{ total_timestep_count }}
+
+Observed trace summary:
+{{ trace_summary }}
+
+Predict what happens after this cutoff. Focus on likely outcome, terminal status, success, and the key physical events that follow.

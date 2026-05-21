@@ -1,0 +1,221 @@
+<script>
+  (() => {
+    if (window.__dashboardRewardChartsInitialized) {
+      return;
+    }
+    window.__dashboardRewardChartsInitialized = true;
+
+    function renderChart(el) {
+      const raw = el.dataset.points;
+      if (!raw) {
+        return;
+      }
+      const metric = el.dataset.metric === "validation" ? "validation" : "train";
+      const metricKey = metric === "validation" ? "val_score" : "train_score";
+      let points;
+      try {
+        points = JSON.parse(raw);
+      } catch (_error) {
+        return;
+      }
+      if (!Array.isArray(points) || points.length === 0) {
+        el.innerHTML = "<p class=\"empty\">No reward data yet.</p>";
+        return;
+      }
+      const numericValues = [];
+      for (const point of points) {
+        const value = point[metricKey];
+        if (
+          typeof value === "number"
+          && Number.isFinite(value)
+          && value >= -1.0
+          && value <= 1.0
+        ) {
+          numericValues.push(value);
+        }
+      }
+      if (numericValues.length === 0) {
+        el.innerHTML = "<p class=\"empty\">No numeric reward data yet.</p>";
+        return;
+      }
+      const width = 720;
+      const height = 280;
+      const margin = { top: 20, right: 18, bottom: 56, left: 52 };
+      let minValue = Math.min(...numericValues);
+      let maxValue = Math.max(...numericValues);
+      if (minValue === maxValue) {
+        minValue -= 1;
+        maxValue += 1;
+      }
+      const innerWidth = width - margin.left - margin.right;
+      const innerHeight = height - margin.top - margin.bottom;
+      const x = (index) => points.length === 1
+        ? margin.left + innerWidth / 2
+        : margin.left + (index / (points.length - 1)) * innerWidth;
+      const y = (value) => margin.top + ((maxValue - value) / (maxValue - minValue)) * innerHeight;
+      const buildPath = (key) => points
+        .map((point, index) => {
+          const value = point[key];
+          if (
+            typeof value !== "number"
+            || !Number.isFinite(value)
+            || value < -1.0
+            || value > 1.0
+          ) {
+            return null;
+          }
+          return `${index === 0 ? "M" : "L"} ${x(index).toFixed(1)} ${y(value).toFixed(1)}`;
+        })
+        .filter(Boolean)
+        .join(" ");
+      const tickValues = Array.from({ length: 5 }, (_item, index) => minValue + ((maxValue - minValue) * index) / 4);
+      const labels = points.map((point, index) => ({ x: x(index), text: String(point.label ?? point.iteration ?? index) }));
+      el.innerHTML = `
+        <div class="loss-chart-frame">
+          <svg viewBox="0 0 ${width} ${height}" class="loss-chart-svg" role="img" aria-label="${el.dataset.chartTitle || "Reward chart"}">
+            ${tickValues.map((value) => `
+              <g>
+                <line x1="${margin.left}" y1="${y(value).toFixed(1)}" x2="${width - margin.right}" y2="${y(value).toFixed(1)}" class="loss-grid-line" />
+                <text x="${margin.left - 8}" y="${(y(value) + 4).toFixed(1)}" text-anchor="end" class="loss-axis-label">${value.toFixed(2)}</text>
+              </g>
+            `).join("")}
+            <line x1="${margin.left}" y1="${height - margin.bottom}" x2="${width - margin.right}" y2="${height - margin.bottom}" class="loss-axis-line" />
+            <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}" class="loss-axis-line" />
+            <path d="${buildPath(metricKey)}" class="loss-series ${metricClass}" />
+            ${labels.map((label) => `<text x="${label.x.toFixed(1)}" y="${height - margin.bottom + 18}" text-anchor="middle" class="loss-axis-label loss-x-label">${label.text}</text>`).join("")}
+          </svg>
+          ${el.dataset.xLabel ? `<div class="loss-axis-caption">${el.dataset.xLabel}</div>` : ""}
+        </div>
+      `;
+    }
+
+    function renderTrajectoryChart(el) {
+      const raw = el.dataset.points;
+      if (!raw) {
+        return;
+      }
+      let payload;
+      try {
+        payload = JSON.parse(raw);
+      } catch (_error) {
+        return;
+      }
+      const series = Array.isArray(payload.series) ? payload.series : [];
+      if (series.length === 0) {
+        el.innerHTML = "<p class=\"empty\">No reward data yet.</p>";
+        return;
+      }
+      const values = [];
+      let maxIteration = 0;
+      for (const item of series) {
+        for (const point of item.values || []) {
+          if (typeof point.reward === "number" && Number.isFinite(point.reward)) {
+            values.push(point.reward);
+          }
+          if (typeof point.iteration === "number" && Number.isFinite(point.iteration)) {
+            maxIteration = Math.max(maxIteration, point.iteration);
+          }
+        }
+      }
+      if (values.length === 0) {
+        el.innerHTML = "<p class=\"empty\">No numeric reward data yet.</p>";
+        return;
+      }
+      const width = el.classList.contains("trajectory-chart-large") ? 980 : 760;
+      const height = el.classList.contains("trajectory-chart-large") ? 420 : 320;
+      const margin = { top: 20, right: 20, bottom: 56, left: 52 };
+      let minValue = Math.min(...values);
+      let maxValue = Math.max(...values);
+      if (minValue === maxValue) {
+        minValue -= 1;
+        maxValue += 1;
+      }
+      const innerWidth = width - margin.left - margin.right;
+      const innerHeight = height - margin.top - margin.bottom;
+      const x = (iteration) => margin.left + ((iteration || 0) / Math.max(maxIteration, 1)) * innerWidth;
+      const y = (value) => margin.top + ((maxValue - value) / (maxValue - minValue)) * innerHeight;
+      const palette = ["#b35c00", "#0d7a6f", "#6b3fa0", "#a23b5a", "#1f5f8b", "#5a7f22", "#8c4c16", "#365d73"];
+      const tickValues = Array.from({ length: 5 }, (_item, index) => minValue + ((maxValue - minValue) * index) / 4);
+      const xTicks = Array.from({ length: Math.min(maxIteration + 1, 6) }, (_item, index, arr) =>
+        Math.round((maxIteration * index) / Math.max(arr.length - 1, 1))
+      );
+      const zeroLineMarkup = minValue <= 0 && maxValue >= 0
+        ? `
+              <g>
+                <line x1="${margin.left}" y1="${y(0).toFixed(1)}" x2="${width - margin.right}" y2="${y(0).toFixed(1)}" class="loss-zero-line" />
+                <text x="${margin.left - 8}" y="${(y(0) + 4).toFixed(1)}" text-anchor="end" class="loss-axis-label loss-zero-label">0</text>
+              </g>
+            `
+        : "";
+
+      const lineMarkup = [];
+      const legendMarkup = [];
+      series.forEach((item, index) => {
+        const paletteIndex = Number.isInteger(item.palette_index) ? item.palette_index : index;
+        const color = palette[paletteIndex % palette.length];
+        const points = Array.isArray(item.values) ? item.values : [];
+        const runningBestPoints = [];
+        let bestSoFar = null;
+        points.forEach((point) => {
+          if (typeof point.reward !== "number" || !Number.isFinite(point.reward)) {
+            return;
+          }
+          if (bestSoFar === null || point.reward > bestSoFar) {
+            bestSoFar = point.reward;
+            runningBestPoints.push(point);
+          }
+        });
+        const path = points
+          .filter((point) => typeof point.reward === "number" && Number.isFinite(point.reward))
+          .map((point, pointIndex) => `${pointIndex === 0 ? "M" : "L"} ${x(point.iteration).toFixed(1)} ${y(point.reward).toFixed(1)}`)
+          .join(" ");
+        if (!path) {
+          return;
+        }
+        lineMarkup.push(`<path d="${path}" fill="none" stroke="${color}" stroke-width="2.4" stroke-opacity="0.42" />`);
+        lineMarkup.push(points.map((point) => (
+          typeof point.reward === "number" && Number.isFinite(point.reward)
+            ? `<circle cx="${x(point.iteration).toFixed(1)}" cy="${y(point.reward).toFixed(1)}" r="2.2" fill="${color}" fill-opacity="0.34" />`
+            : ""
+        )).join(""));
+        runningBestPoints.forEach((bestPoint) => {
+          lineMarkup.push(
+            `<circle cx="${x(bestPoint.iteration).toFixed(1)}" cy="${y(bestPoint.reward).toFixed(1)}" r="7.2" fill="${color}" fill-opacity="0.16" />`
+          );
+          lineMarkup.push(
+            `<circle cx="${x(bestPoint.iteration).toFixed(1)}" cy="${y(bestPoint.reward).toFixed(1)}" r="4.8" fill="${color}" stroke="white" stroke-width="1.8" />`
+          );
+        });
+        legendMarkup.push(`<span><i class="legend-swatch" style="background:${color}; border-color:${color};"></i>${item.label}</span>`);
+      });
+
+      el.innerHTML = `
+        <div class="loss-chart-frame">
+          <div class="loss-chart-legend">${legendMarkup.join("")}</div>
+          <svg viewBox="0 0 ${width} ${height}" class="loss-chart-svg" role="img" aria-label="${el.dataset.chartTitle || "Reward chart"}">
+            ${tickValues.map((value) => `
+              <g>
+                <line x1="${margin.left}" y1="${y(value).toFixed(1)}" x2="${width - margin.right}" y2="${y(value).toFixed(1)}" class="loss-grid-line" />
+                <text x="${margin.left - 8}" y="${(y(value) + 4).toFixed(1)}" text-anchor="end" class="loss-axis-label">${value.toFixed(2)}</text>
+              </g>
+            `).join("")}
+            ${zeroLineMarkup}
+            ${xTicks.map((tick) => `
+              <g>
+                <line x1="${x(tick).toFixed(1)}" y1="${margin.top}" x2="${x(tick).toFixed(1)}" y2="${height - margin.bottom}" class="loss-grid-line" />
+                <text x="${x(tick).toFixed(1)}" y="${height - margin.bottom + 18}" text-anchor="middle" class="loss-axis-label loss-x-label">${tick}</text>
+              </g>
+            `).join("")}
+            <line x1="${margin.left}" y1="${height - margin.bottom}" x2="${width - margin.right}" y2="${height - margin.bottom}" class="loss-axis-line" />
+            <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}" class="loss-axis-line" />
+            ${lineMarkup.join("")}
+          </svg>
+          ${el.dataset.xLabel ? `<div class="loss-axis-caption">${el.dataset.xLabel}</div>` : ""}
+        </div>
+      `;
+    }
+
+    document.querySelectorAll(".loss-chart").forEach(renderChart);
+    document.querySelectorAll(".trajectory-chart").forEach(renderTrajectoryChart);
+  })();
+</script>

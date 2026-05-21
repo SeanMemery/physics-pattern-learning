@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }}</title>
+    <link rel="stylesheet" href="{{ request.url_for('dashboard-static', path='dashboard.css') }}">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="page-header">
+        <div class="header-inner">
+          <div>
+            <div class="eyebrow">Pattern Learning Workspace</div>
+            <a class="home-link" href="/">Pattern Learning Dashboard</a>
+            <p class="tagline">Compact control for datasets, supervised runs, automatic runs, and library inspection.</p>
+          </div>
+          <nav class="header-nav" aria-label="Primary">
+            {% set default_links = [{"href": "/", "label": "Overview", "active": false}] %}
+            {% set links = nav_links if nav_links is defined and nav_links else default_links %}
+            {% for link in links %}
+              <a class="header-nav-link{% if link.active %} is-active{% endif %}" href="{{ link.href }}">{{ link.label }}</a>
+            {% endfor %}
+          </nav>
+        </div>
+      </header>
+      <main class="page-main">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </body>
+</html>

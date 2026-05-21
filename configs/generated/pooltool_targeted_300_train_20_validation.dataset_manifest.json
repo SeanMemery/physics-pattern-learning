@@ -1,0 +1,117 @@
+{
+  "dataset_schema_version": "1",
+  "trace_schema_version": "1",
+  "output_root": "data/datasets/pooltool/default_simulator_trace_dataset",
+  "dataset_name": "default_simulator_trace_dataset",
+  "dataset_id": "default_simulator_trace_dataset",
+  "config_version": "1",
+  "config_source": null,
+  "env_ids": [
+    "pooltool"
+  ],
+  "splits": [
+    {
+      "name": "train",
+      "sample_count": 300,
+      "sample_offset": 0,
+      "env_counts": {
+        "pooltool": 300
+      },
+      "completed_samples": 300
+    },
+    {
+      "name": "validation",
+      "sample_count": 20,
+      "sample_offset": 500000,
+      "env_counts": {
+        "pooltool": 20
+      },
+      "completed_samples": 20
+    },
+    {
+      "name": "test",
+      "sample_count": 100,
+      "sample_offset": 1000000,
+      "env_counts": {
+        "pooltool": 100
+      },
+      "completed_samples": 100
+    }
+  ],
+  "notes": [
+    "Default large-run dataset config for the four simulator-backed environments.",
+    "Reduced manifest for targeted pooltool supervised weak-label runs: 300 train / 20 validation."
+  ],
+  "config": {
+    "config_version": "1",
+    "dataset_name": "default_simulator_trace_dataset",
+    "env_ids": [
+      "pooltool"
+    ],
+    "splits": [
+      {
+        "name": "train",
+        "sample_count": 300,
+        "sample_offset": 0
+      },
+      {
+        "name": "validation",
+        "sample_count": 20,
+        "sample_offset": 500000
+      },
+      {
+        "name": "test",
+        "sample_count": 100,
+        "sample_offset": 1000000
+      }
+    ],
+    "notes": [
+      "Default large-run dataset config for the four simulator-backed environments.",
+      "Reduced manifest for targeted pooltool supervised weak-label runs: 300 train / 20 validation."
+    ]
+  },
+  "split_reports": {
+    "test": {
+      "output_root": "data/datasets/pooltool/default_simulator_trace_dataset/test",
+      "per_environment": [
+        {
+          "env_id": "pooltool",
+          "status": "completed",
+          "generated": 100,
+          "saved_dir": "data/datasets/pooltool/default_simulator_trace_dataset/test",
+          "blocked_reason": null,
+          "errors": [],
+          "warnings": []
+        }
+      ]
+    },
+    "validation": {
+      "output_root": "data/datasets/pooltool/default_simulator_trace_dataset/validation",
+      "per_environment": [
+        {
+          "env_id": "pooltool",
+          "status": "completed",
+          "generated": 100,
+          "saved_dir": "data/datasets/pooltool/default_simulator_trace_dataset/validation",
+          "blocked_reason": null,
+          "errors": [],
+          "warnings": []
+        }
+      ]
+    },
+    "train": {
+      "output_root": "data/datasets/pooltool/default_simulator_trace_dataset/train",
+      "per_environment": [
+        {
+          "env_id": "pooltool",
+          "status": "completed",
+          "generated": 401,
+          "saved_dir": "data/datasets/pooltool/default_simulator_trace_dataset/train",
+          "blocked_reason": null,
+          "errors": [],
+          "warnings": []
+        }
+      ]
+    }
+  }
+}

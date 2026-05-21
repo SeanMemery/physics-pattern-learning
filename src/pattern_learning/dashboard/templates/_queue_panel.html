@@ -1,0 +1,249 @@
+<section class="card queue-panel">
+  <div class="card-topline">
+    <div>
+      <p class="section-kicker">Queue</p>
+      <h2>Scheduled launches</h2>
+    </div>
+    <div class="router-summary-pills">
+      <span class="pill">Queued {{ queue_settings.queued_count }}</span>
+      <span class="pill">Active {{ queue_settings.active_count }}/{{ queue_settings.max_concurrent_jobs }}</span>
+    </div>
+  </div>
+
+  <div class="queue-controls">
+    <form method="post" action="/jobs/queue/settings" class="queue-settings-form">
+      <input type="hidden" name="next" value="/">
+      <label>
+        <span class="metric-subtle">Concurrent queue jobs</span>
+        <input type="number" min="1" step="1" name="max_concurrent_jobs" value="{{ queue_settings.max_concurrent_jobs }}">
+      </label>
+      <label>
+        <input type="checkbox" name="enforce_single_pooltool_job" value="1"{% if queue_settings.enforce_single_pooltool_job %} checked{% endif %}>
+        <span class="metric-subtle">One PoolTool job globally</span>
+      </label>
+      <button class="secondary-button small-button" type="submit">Apply</button>
+    </form>
+  </div>
+
+  {% if queued_home_jobs %}
+    {% set ns = namespace(active_count=0, paused_count=0, pending_count=0) %}
+    {% for job in queued_home_jobs %}
+      {% if job.status == "running" %}
+        {% set ns.active_count = ns.active_count + 1 %}
+      {% elif job.status == "paused" %}
+        {% set ns.paused_count = ns.paused_count + 1 %}
+      {% elif job.status == "queued" %}
+        {% set ns.pending_count = ns.pending_count + 1 %}
+      {% endif %}
+    {% endfor %}
+
+    {% if ns.active_count %}
+      <div class="queue-section">
+        <div class="queue-section-header">
+          <h3>Active</h3>
+        </div>
+        <div class="queue-list">
+          {% for job in queued_home_jobs if job.status == "running" %}
+            <article class="queue-item{% if job.is_queue_head %} is-head{% endif %}">
+              <div class="queue-item-main">
+                <div class="queue-item-title-row">
+                  <a class="metric-title" href="{{ job.target_url }}">{{ job.target_label }}</a>
+                  <span class="pill status-{{ job.status }}">{{ job.status }}</span>
+                </div>
+                <p class="metric-subtle">{{ job.env_id or "—" }} · {{ job.action_label }}</p>
+                <p class="metric-subtle">
+                  {% if job.started_at %}
+                    Started {{ job.started_at_display }}
+                  {% else %}
+                    Created {{ job.created_at_display }}
+                  {% endif %}
+                </p>
+                {% set evaluation_progress = job.evaluation_progress if job.evaluation_progress is defined else none %}
+                {% if evaluation_progress %}
+                  {% set completed_tasks = evaluation_progress.completed_tasks or 0 %}
+                  {% set total_tasks = evaluation_progress.total_tasks %}
+                  {% set task_progress_width = (completed_tasks / total_tasks * 100) if total_tasks else 0 %}
+                  <div class="progress-block queue-item-progress">
+                    <div class="progress-meta">
+                      <span>Tasks</span>
+                      <span>
+                        {% if total_tasks %}
+                          {{ completed_tasks }}/{{ total_tasks }}
+                        {% else %}
+                          {{ completed_tasks }} done
+                        {% endif %}
+                      </span>
+                    </div>
+                    <div class="progress-track" aria-label="Completed evaluation tasks">
+                      <span class="progress-fill" style="width: {{ '%.1f'|format(task_progress_width) if total_tasks else '0.0' }}%"></span>
+                    </div>
+                  </div>
+                {% endif %}
+                {% set progress_summary = job.learning_progress.progress_summary if job.learning_progress is defined else none %}
+                {% if progress_summary and progress_summary.total_labels %}
+                  {% set completed_labels = progress_summary.completed_labels or 0 %}
+                  {% set total_labels = progress_summary.total_labels or 0 %}
+                  {% set label_progress_width = (completed_labels / total_labels * 100) if total_labels else 0 %}
+                  <div class="progress-block queue-item-progress">
+                    <div class="progress-meta">
+                      <span>Labels</span>
+                      <span>{{ completed_labels }}/{{ total_labels }}</span>
+                    </div>
+                    <div class="progress-track" aria-label="Finished labels">
+                      <span class="progress-fill" style="width: {{ '%.1f'|format(label_progress_width) }}%"></span>
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
+              <div class="queue-item-meta">
+                <span class="mini-chip">
+                  {% if job.is_queue_head %}
+                    Head
+                  {% else %}
+                    Active
+                  {% endif %}
+                </span>
+                {% if job.can_resume %}
+                  <form method="post" action="/jobs/{{ job.job_id }}/resume" class="queue-item-action">
+                    <input type="hidden" name="next" value="/">
+                    <button class="secondary-button small-button" type="submit">Resume</button>
+                  </form>
+                {% endif %}
+                {% if job.can_requeue %}
+                  <form method="post" action="/jobs/{{ job.job_id }}/requeue" class="queue-item-action">
+                    <input type="hidden" name="next" value="/">
+                    <button class="secondary-button small-button" type="submit">Requeue</button>
+                  </form>
+                {% endif %}
+                <a class="ghost-link" href="/jobs/{{ job.job_id }}">Job</a>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    {% if ns.paused_count %}
+      <div class="queue-section">
+        <div class="queue-section-header">
+          <h3>Paused</h3>
+        </div>
+        <div class="queue-list">
+          {% for job in queued_home_jobs if job.status == "paused" %}
+            <article class="queue-item{% if job.is_queue_head %} is-head{% endif %}">
+              <div class="queue-item-main">
+                <div class="queue-item-title-row">
+                  <a class="metric-title" href="{{ job.target_url }}">{{ job.target_label }}</a>
+                  <span class="pill status-{{ job.status }}">{{ job.status }}</span>
+                </div>
+                <p class="metric-subtle">{{ job.env_id or "—" }} · {{ job.action_label }}</p>
+                <p class="metric-subtle">
+                  {% if job.started_at %}
+                    Started {{ job.started_at_display }}
+                  {% else %}
+                    Created {{ job.created_at_display }}
+                  {% endif %}
+                </p>
+                {% set evaluation_progress = job.evaluation_progress if job.evaluation_progress is defined else none %}
+                {% if evaluation_progress %}
+                  {% set completed_tasks = evaluation_progress.completed_tasks or 0 %}
+                  {% set total_tasks = evaluation_progress.total_tasks %}
+                  {% set task_progress_width = (completed_tasks / total_tasks * 100) if total_tasks else 0 %}
+                  <div class="progress-block queue-item-progress">
+                    <div class="progress-meta">
+                      <span>Tasks</span>
+                      <span>
+                        {% if total_tasks %}
+                          {{ completed_tasks }}/{{ total_tasks }}
+                        {% else %}
+                          {{ completed_tasks }} done
+                        {% endif %}
+                      </span>
+                    </div>
+                    <div class="progress-track" aria-label="Completed evaluation tasks">
+                      <span class="progress-fill" style="width: {{ '%.1f'|format(task_progress_width) if total_tasks else '0.0' }}%"></span>
+                    </div>
+                  </div>
+                {% endif %}
+                {% set progress_summary = job.learning_progress.progress_summary if job.learning_progress is defined else none %}
+                {% if progress_summary and progress_summary.total_labels %}
+                  {% set completed_labels = progress_summary.completed_labels or 0 %}
+                  {% set total_labels = progress_summary.total_labels or 0 %}
+                  {% set label_progress_width = (completed_labels / total_labels * 100) if total_labels else 0 %}
+                  <div class="progress-block queue-item-progress">
+                    <div class="progress-meta">
+                      <span>Labels</span>
+                      <span>{{ completed_labels }}/{{ total_labels }}</span>
+                    </div>
+                    <div class="progress-track" aria-label="Finished labels">
+                      <span class="progress-fill" style="width: {{ '%.1f'|format(label_progress_width) }}%"></span>
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
+              <div class="queue-item-meta">
+                <span class="mini-chip">Paused</span>
+                {% if job.can_resume %}
+                  <form method="post" action="/jobs/{{ job.job_id }}/resume" class="queue-item-action">
+                    <input type="hidden" name="next" value="/">
+                    <button class="secondary-button small-button" type="submit">Resume</button>
+                  </form>
+                {% endif %}
+                {% if job.can_requeue %}
+                  <form method="post" action="/jobs/{{ job.job_id }}/requeue" class="queue-item-action">
+                    <input type="hidden" name="next" value="/">
+                    <button class="secondary-button small-button" type="submit">Requeue</button>
+                  </form>
+                {% endif %}
+                <a class="ghost-link" href="/jobs/{{ job.job_id }}">Job</a>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    {% if ns.pending_count %}
+      <div class="queue-section">
+        <div class="queue-section-header">
+          <h3>Queued order</h3>
+        </div>
+        <div
+          class="queue-list queue-sort-list"
+          data-queue-sort-list
+          data-queue-reorder-url="/jobs/queue/reorder"
+        >
+          {% for job in queued_home_jobs if job.status == "queued" %}
+            <article
+              class="queue-item queue-item-draggable"
+              draggable="true"
+              data-queue-job-id="{{ job.job_id }}"
+            >
+              <div class="queue-item-main">
+                <div class="queue-item-title-row">
+                  <span class="queue-drag-handle" aria-hidden="true">⋮⋮</span>
+                  <a class="metric-title" href="{{ job.target_url }}">{{ job.target_label }}</a>
+                  <span class="pill status-{{ job.status }}">{{ job.status }}</span>
+                </div>
+                <p class="metric-subtle">{{ job.env_id or "—" }} · {{ job.action_label }}</p>
+                <p class="metric-subtle">Created {{ job.created_at_display }}</p>
+              </div>
+              <div class="queue-item-meta">
+                <span class="mini-chip">
+                  {% if ns.active_count %}
+                    #{{ loop.index + ns.active_count }}
+                  {% else %}
+                    Head
+                  {% endif %}
+                </span>
+                <a class="ghost-link" href="/jobs/{{ job.job_id }}">Job</a>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  {% else %}
+    <p class="empty inline">No queued launches.</p>
+  {% endif %}
+</section>

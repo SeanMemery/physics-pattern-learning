@@ -1,0 +1,42 @@
+Repair the {{ environment_id|upper }} detector candidate for the target label `{{ label }}`.
+
+Return Python code only with exactly one function:
+
+def find_pattern(trace):
+    ...
+
+Constraints:
+- no imports
+- inspect only the provided `trace` dict
+- return a list of pattern dicts
+- every emitted pattern must include `label`, `start_timestep`, `end_timestep`, and `parameters`
+- use inclusive timestep spans; if the pattern is point-like, set `start_timestep == end_timestep`
+- choose the narrowest specific timestep span supported by the evidence; do not default to the full trace unless the pattern truly persists for the entire trace
+- `parameters` must include an `object_details` dict keyed by object id or role, with each entry describing the object's role in the pattern, geometry/shape, and where the pattern starts/ends for that object
+- use the exact target label `{{ label }}`
+- preserve the detector intent unless the validation error requires structural change
+
+I-PHYRE reminder:
+- most reasoning should use `trace["timesteps"][i]["objects"]`
+- object fields include `x1`, `y1`, `x2`, `y2`, `radius`, `dynamic`, `eliminable`, `joint`, `spring`
+- the center of an object can be approximated from its endpoints
+- `joint` and `spring` are numeric identifiers; `0` means absent
+- `trace["events"]` usually only gives sparse scheduled interventions
+- repair detectors so they emit timestep spans, not wall-clock times
+- repair detectors so they pick concrete evidence-backed start/end timesteps, not the entire trace by default
+
+Compact trace example:
+```python
+{"timesteps": [{"objects": [{"x1": float, "y1": float, "x2": float, "y2": float, "dynamic": float, "eliminable": float, "joint": int, "spring": int}]}], "events": [{"kind": "scheduled_action"}], "outcome": {"success": bool, "terminal_status": "str"}}
+```
+
+Validation error:
+- category={{ error_category }}
+- message={{ error_message }}
+- line={{ error_line }}
+- column={{ error_column }}
+
+Broken candidate:
+```python
+{{ broken_code }}
+```

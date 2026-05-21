@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ summary.env_id }}">{{ summary.env_id }}</a> / {{ summary.dataset_name }}</p>
+  <h1>{{ summary.dataset_name }}</h1>
+  <p>Inspect split-level coverage and open individual samples for metadata and preview media.</p>
+</section>
+
+<section class="content-grid">
+  <section class="panel">
+    <h2>Dataset summary</h2>
+    <p class="metric-subtle">Resume continues this dataset in place by reusing the same output directory and filling incomplete indexed samples.</p>
+    <div class="metric-stack">
+      <div class="metric-row"><span>Total completed</span><strong>{{ summary.total_completed_count }}</strong></div>
+      <div class="metric-row"><span>Indexed samples</span><strong>{{ summary.total_indexed_count }}</strong></div>
+      <div class="metric-row"><span>Manifest</span><strong class="truncate">{{ summary.manifest_path if summary.manifest_path else "missing" }}</strong></div>
+      <div class="metric-row"><span>Dataset index</span><strong class="truncate">{{ summary.index_path if summary.index_path else "missing" }}</strong></div>
+    </div>
+    <div class="button-row">
+      <form method="post" action="/env/{{ summary.env_id }}/datasets/build">
+        <input type="hidden" name="dataset_name" value="{{ summary.dataset_name }}">
+        <button class="primary-button" type="submit">Resume dataset</button>
+      </form>
+      <form method="post" action="/env/{{ summary.env_id }}/datasets/{{ summary.dataset_name }}/delete" onsubmit="return confirm('Delete dataset {{ summary.dataset_name }}? This removes all saved samples and manifests.');">
+        <input type="hidden" name="next" value="/env/{{ summary.env_id }}">
+        <button class="secondary-button danger-button" type="submit">Delete dataset</button>
+      </form>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>Recent dataset jobs</h2>
+    {% if recent_dataset_jobs %}
+      {% for job in recent_dataset_jobs[:5] %}
+      <div class="job-item">
+        <div class="card-topline">
+          <h3><a href="/jobs/{{ job.job_id }}">{{ job.name }}</a></h3>
+          <span class="pill">{{ job.status }}</span>
+        </div>
+        <p class="metric-subtle">{{ display_time(job.created_at) }}</p>
+        <div class="button-row">
+          {% if job.metadata.get("supports_pause") and job.status in ["queued", "running"] %}
+          <form method="post" action="/jobs/{{ job.job_id }}/pause">
+            <input type="hidden" name="next" value="/env/{{ summary.env_id }}/datasets/{{ summary.dataset_name }}">
+            <button class="secondary-button" type="submit">Pause</button>
+          </form>
+          {% elif job.metadata.get("supports_pause") and job.status == "paused" %}
+          <form method="post" action="/jobs/{{ job.job_id }}/resume">
+            <input type="hidden" name="next" value="/env/{{ summary.env_id }}/datasets/{{ summary.dataset_name }}">
+            <button class="secondary-button" type="submit">Unpause</button>
+          </form>
+          <form method="post" action="/jobs/{{ job.job_id }}/exit">
+            <input type="hidden" name="next" value="/env/{{ summary.env_id }}/datasets/{{ summary.dataset_name }}">
+            <button class="secondary-button danger-button" type="submit">Exit</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+    <p class="empty">No dashboard-managed dataset jobs recorded for this dataset.</p>
+    {% endif %}
+  </section>
+</section>
+
+<section class="panel">
+  <h2>Split details</h2>
+  {% for split in summary.splits %}
+  <div class="dataset-block">
+    <div class="card-topline">
+      <h3>{{ split.name }}</h3>
+      <span class="pill">{{ split.indexed_count }} indexed</span>
+    </div>
+    <div class="metric-subtle split-summary-line">
+      Completed {{ split.completed_count }}
+      {% if split.target_count is not none %} · Target {{ split.target_count }}{% endif %}
+      {% if split.manifest_completed_count is not none %} · Manifest completed {{ split.manifest_completed_count }}{% endif %}
+    </div>
+    {% if split.indexed_samples %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Sample</th>
+          <th>Status</th>
+          <th>Success</th>
+          <th>Trace ID</th>
+          <th>Task ID</th>
+          <th>Media</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sample in split.indexed_samples %}
+        <tr>
+          <td>{{ sample.absolute_sample_index }}</td>
+          <td><a href="/env/{{ summary.env_id }}/datasets/{{ summary.dataset_name }}/{{ split.name }}/{{ sample.sample_name }}">{{ sample.sample_name }}</a></td>
+          <td>{{ sample.status }}</td>
+          <td>
+            {% if sample.success is sameas true %}
+              yes
+            {% elif sample.success is sameas false %}
+              no
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>{{ sample.trace_id if sample.trace_id else "—" }}</td>
+          <td>{{ sample.task_id if sample.task_id else "—" }}</td>
+          <td>
+            {% if sample.scene_image_path %}
+              <span class="pill">scene</span>
+            {% endif %}
+            {% if sample.simulation_path %}
+              <span class="pill">simulation</span>
+            {% endif %}
+            {% if not sample.has_media %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty inline">No indexed samples found for this split.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
+{% endblock %}

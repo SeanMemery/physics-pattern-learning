@@ -1,0 +1,80 @@
+You are writing a Python detector for the {{ environment_id|upper }} environment.
+Target primitive label: {{ label }}
+Search step: {{ step }}
+
+Write Python code only. Define exactly one function:
+
+def find_pattern(trace):
+    ...
+
+Rules:
+- no imports
+- inspect only the provided `trace` dict
+- return a list of pattern dicts
+- each pattern dict must contain `label`, `start_timestep`, `end_timestep`, and `parameters`
+- use inclusive timestep spans; if the pattern is effectively instantaneous, set `start_timestep == end_timestep`
+- choose the narrowest specific timestep span supported by the evidence; do not default to the full trace unless the pattern truly persists for the entire trace
+- `parameters` must include an `object_details` dict keyed by object id or role, with each entry describing the object's role in the pattern, shape, color, and where the pattern starts/ends for that object
+- include object-location details directly in `parameters` when you can infer them from the trace; do not leave the pattern undescribed if object participation is visible
+- optional fields are `provenance` and `metadata`
+- use the exact target label `{{ label }}`
+- if the pattern is absent, return []
+
+PHYRE trace structure:
+- `trace["timesteps"]` is the main signal; it is a dense sequence of simulation frames
+- each timestep has `index`, `t`, `state`, `objects`, `actions`, `attachments`
+- each object typically has `object_index`, `shape`, `color`, `diameter`, `x`, `y`, `angle`, `vx`, `vy`, `angular_velocity`, `is_user_input`
+- the user-controlled placed ball is typically the object with `is_user_input == True`
+- scene geometry and target objects are distinguished mainly by `shape` and `color`
+- `trace["events"]` is sparse and usually only contains coarse status entries like `simulation_status` or `motion_sequence`
+- `trace["outcome"]` holds final task result information such as `success`, `terminal_status`, and metrics like `is_solved`
+
+How to write good PHYRE detectors:
+- derive patterns from motion and object relations over time, not just final outcome
+- use color/shape semantics when useful, especially green, blue, red, black, purple objects
+- detect things like contact, support, containment, escape, or rolling by comparing object positions across timesteps
+- prefer simple geometry heuristics over brittle exact thresholds
+- do not assume object indices are consistent across different tasks
+- when emitting a pattern, mark the inclusive timestep range where it is visibly active
+- pick concrete start/end timesteps where the pattern is actually visible, not just the earliest and latest timestep in the trace
+
+Compact trace example:
+```python
+{
+  "environment": "phyre",
+  "task_id": "str",
+  "timesteps": [
+    {
+      "index": int,
+      "t": float,
+      "objects": [
+        {
+          "object_index": int,
+          "shape": "str",
+          "color": "str",
+          "diameter": float,
+          "x": float,
+          "y": float,
+          "angle": float,
+          "vx": float,
+          "vy": float,
+          "angular_velocity": float,
+          "is_user_input": bool
+        }
+      ]
+    }
+  ],
+  "events": [{"kind": "str", "payload": {...}}],
+  "outcome": {"success": bool, "terminal_status": "str", "metrics": {...}}
+}
+```
+
+Your objective is to maximize the training reward.
+Learn from this example what works, keep the strong ideas, remove weak or brittle logic, and produce a better detector.
+
+Improve this parent candidate:
+```python
+{{ parent_code }}
+```
+
+Parent candidate training reward to maximize: {{ parent_metadata.average_score }}

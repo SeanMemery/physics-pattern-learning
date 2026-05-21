@@ -1,0 +1,17 @@
+{
+  "expectations_version": "1",
+  "fixtures": [
+    {
+      "env_id": "phyre",
+      "task_id": "fixture-phyre",
+      "expected_outcome": {
+        "task_name": "solved_status",
+        "success": true,
+        "terminal_status": "SOLVED"
+      },
+      "expected_metrics": {
+        "is_solved": true
+      }
+    }
+  ]
+}

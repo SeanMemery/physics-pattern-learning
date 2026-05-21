@@ -1,0 +1,19 @@
+config_version: "1"
+dataset_name: "default_simulator_trace_dataset"
+env_ids:
+  - phyre
+  - iphyre
+  - kinetix
+  - pooltool
+splits:
+  - name: train
+    sample_count: 1000
+    sample_offset: 0
+  - name: validation
+    sample_count: 100
+    sample_offset: 500000
+  - name: test
+    sample_count: 100
+    sample_offset: 1000000
+notes:
+  - "Default large-run dataset config for the four simulator-backed environments."

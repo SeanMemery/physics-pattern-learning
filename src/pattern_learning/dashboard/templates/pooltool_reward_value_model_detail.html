@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/pooltool/reward-programs">PoolTool reward programs</a> / value model / {{ run_id }}</p>
+  <h1>Value model · {{ run_id }}</h1>
+  <p>Train a reward-conditioned value model from PoolTool rollouts labeled by the synthesized reward program.</p>
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <span class="stat-label">Source</span>
+      <strong class="stat-value">{{ summary.source_run_id if summary else (run_state.source_run_dir or "—") }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Train samples</span>
+      <strong class="stat-value">{{ summary.train_sample_count if summary else "—" }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Validation scenes</span>
+      <strong class="stat-value">{{ summary.validation_scene_count if summary else "—" }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Status</span>
+      <strong class="stat-value">{{ run_state.status }}</strong>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Local run state</h2>
+  <p><strong>Status:</strong> {{ run_state.status }}</p>
+  <p><strong>Started:</strong> {{ display_time(run_state.started_at) if run_state.started_at else "—" }}</p>
+  <p><strong>Updated:</strong> {{ display_time(run_state.updated_at) if run_state.updated_at else "—" }}</p>
+  {% if run_state.progress %}
+    <pre class="log-block">{{ run_state.progress | tojson(indent=2) }}</pre>
+  {% endif %}
+</section>
+
+<section class="content-grid">
+  <section class="panel">
+    <h2>Goal</h2>
+    <p>{{ summary.goal_text if summary else run_state.request.get("goal_text", "") or "No natural-language goal saved." }}</p>
+    <h2>Reward DSL</h2>
+    <pre class="code-block">{{ program_text }}</pre>
+  </section>
+
+  <section class="panel">
+    <h2>Training curve</h2>
+    {% if summary and summary.eval_curve %}
+    <div class="scroll-table compact-scroll-table">
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>Epoch</th>
+            <th>Train loss</th>
+            <th>Val reward</th>
+            <th>Val success</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for point in summary.eval_curve %}
+          <tr>
+            <td>{{ point.epoch }}</td>
+            <td>{{ "%.4f"|format(point.train_loss) }}</td>
+            <td>{{ "%.3f"|format(point.validation_mean_reward) }}</td>
+            <td>{{ "%.1f%%"|format(point.validation_success_rate * 100) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty">No summary saved yet.</p>
+    {% endif %}
+  </section>
+</section>
+
+{% if synthesis_text %}
+<section class="panel">
+  <h2>Synthesis response</h2>
+  <pre class="log-block">{{ synthesis_text }}</pre>
+</section>
+{% endif %}
+
+{% if run_state.recent_output %}
+<section class="panel">
+  <h2>Recent output</h2>
+  <pre class="log-block">{{ run_state.recent_output | join('\n') }}</pre>
+</section>
+{% endif %}
+{% endblock %}

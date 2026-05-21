@@ -1,0 +1,101 @@
+from __future__ import annotations
+
+from importlib import import_module
+
+__all__ = [
+    "ChatCompletionsResponder",
+    "ConditionedBenchmarkRequest",
+    "DetectorDefinition",
+    "OllamaResponder",
+    "PATTERN_SCHEMA_VERSION",
+    "PATTERN_LEARNING_CONFIG_VERSION",
+    "PatternEvidence",
+    "PatternLearningConfig",
+    "Pattern",
+    "PatternLibrary",
+    "PatternLearningRun",
+    "PatternLearningSample",
+    "PatternPrompt",
+    "PatternResponder",
+    "LossConfig",
+    "PatternSetRuntime",
+    "PatternTextBundle",
+    "apply_detector",
+    "apply_pattern_library",
+    "build_pattern_prediction_prompt",
+    "build_prediction_request_prompt",
+    "build_pattern_evidence",
+    "condition_benchmark_request",
+    "default_pattern_learning_config_path",
+    "load_learning_samples_from_prediction_manifest",
+    "load_pattern_labels",
+    "load_pattern_learning_config",
+    "load_pattern_evidence",
+    "load_pattern_library",
+    "load_pattern_set_runtime",
+    "default_pattern_output_path",
+    "default_pattern_run_dir",
+    "pattern_library_path_for_run_dir",
+    "resolve_pattern_library_path",
+    "resolve_pattern_run_dir",
+    "pattern_evidence_path",
+    "run_pattern_learning",
+    "save_pattern_library",
+    "serialize_pattern_evidence",
+    "serialize_patterns",
+    "write_pattern_evidence",
+]
+
+_EXPORTS = {
+    "ChatCompletionsResponder": ("pattern_learning.patterns.scoring", "ChatCompletionsResponder"),
+    "apply_detector": ("pattern_library_detectors", "apply_detector"),
+    "apply_pattern_library": ("pattern_library_detectors", "apply_pattern_library"),
+    "build_pattern_evidence": ("pattern_library_evidence", "build_pattern_evidence"),
+    "load_pattern_evidence": ("pattern_library_evidence", "load_pattern_evidence"),
+    "pattern_evidence_path": ("pattern_library_evidence", "pattern_evidence_path"),
+    "write_pattern_evidence": ("pattern_library_evidence", "write_pattern_evidence"),
+    "PATTERN_LEARNING_CONFIG_VERSION": ("pattern_learning.patterns.config", "PATTERN_LEARNING_CONFIG_VERSION"),
+    "PatternLearningConfig": ("pattern_learning.patterns.config", "PatternLearningConfig"),
+    "default_pattern_learning_config_path": ("pattern_learning.patterns.config", "default_pattern_learning_config_path"),
+    "load_pattern_labels": ("pattern_learning.patterns.config", "load_pattern_labels"),
+    "load_pattern_learning_config": ("pattern_learning.patterns.config", "load_pattern_learning_config"),
+    "LossConfig": ("pattern_learning.patterns.losses", "LossConfig"),
+    "PatternLearningRun": ("pattern_learning.patterns.learning", "PatternLearningRun"),
+    "PatternLearningSample": ("pattern_learning.patterns.learning", "PatternLearningSample"),
+    "load_learning_samples_from_prediction_manifest": ("pattern_learning.patterns.learning", "load_learning_samples_from_prediction_manifest"),
+    "run_pattern_learning": ("pattern_learning.patterns.learning", "run_pattern_learning"),
+    "PatternPrompt": ("pattern_learning.patterns.prompts", "PatternPrompt"),
+    "build_pattern_prediction_prompt": ("pattern_learning.patterns.prompts", "build_pattern_prediction_prompt"),
+    "build_prediction_request_prompt": ("pattern_learning.patterns.prompts", "build_prediction_request_prompt"),
+    "default_pattern_output_path": ("pattern_library_paths", "default_pattern_output_path"),
+    "default_pattern_run_dir": ("pattern_library_paths", "default_pattern_run_dir"),
+    "load_pattern_library": ("pattern_library_registry", "load_pattern_library"),
+    "save_pattern_library": ("pattern_library_registry", "save_pattern_library"),
+    "pattern_library_path_for_run_dir": ("pattern_library_paths", "pattern_library_path_for_run_dir"),
+    "ConditionedBenchmarkRequest": ("pattern_library_runtime", "ConditionedBenchmarkRequest"),
+    "PatternSetRuntime": ("pattern_library_runtime", "PatternSetRuntime"),
+    "condition_benchmark_request": ("pattern_library_runtime", "condition_benchmark_request"),
+    "load_pattern_set_runtime": ("pattern_library_runtime", "load_pattern_set_runtime"),
+    "PATTERN_SCHEMA_VERSION": ("pattern_library_schema", "PATTERN_SCHEMA_VERSION"),
+    "DetectorDefinition": ("pattern_library_schema", "DetectorDefinition"),
+    "PatternEvidence": ("pattern_library_schema", "PatternEvidence"),
+    "Pattern": ("pattern_library_schema", "Pattern"),
+    "PatternLibrary": ("pattern_library_schema", "PatternLibrary"),
+    "PatternTextBundle": ("pattern_library_schema", "PatternTextBundle"),
+    "OllamaResponder": ("pattern_learning.patterns.scoring", "OllamaResponder"),
+    "PatternResponder": ("pattern_learning.patterns.scoring", "PatternResponder"),
+    "resolve_pattern_library_path": ("pattern_library_paths", "resolve_pattern_library_path"),
+    "resolve_pattern_run_dir": ("pattern_library_paths", "resolve_pattern_run_dir"),
+    "serialize_pattern_evidence": ("pattern_library_serializer", "serialize_pattern_evidence"),
+    "serialize_patterns": ("pattern_library_serializer", "serialize_patterns"),
+}
+
+
+def __getattr__(name: str):
+    if name not in _EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attr_name = _EXPORTS[name]
+    module = import_module(module_name)
+    value = getattr(module, attr_name)
+    globals()[name] = value
+    return value

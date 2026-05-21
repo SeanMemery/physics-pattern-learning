@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero hero-compact">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ summary.env_id }}">{{ summary.env_id }}</a> / libraries</p>
+  <h1>{{ summary.env_id }} libraries</h1>
+  <p>Browse supervised, automatic, and unsupervised libraries without the launch controls.</p>
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <span class="stat-label">Supervised</span>
+      <strong class="stat-value">{{ summary.supervised_libraries|length }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Automatic</span>
+      <strong class="stat-value">{{ summary.automatic_libraries|length }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Unsupervised</span>
+      <strong class="stat-value">{{ summary.unsupervised_libraries|length }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Datasets</span>
+      <strong class="stat-value">{{ summary.datasets|length }}</strong>
+    </div>
+  </div>
+  <div class="button-row">
+    <a class="secondary-button" href="/env/{{ summary.env_id }}">Open workspace</a>
+    <a class="secondary-button" href="/env/{{ summary.env_id }}/compare">Compare supervised runs</a>
+  </div>
+</section>
+
+<section class="content-grid">
+  <section class="panel">
+    <div class="card-topline">
+      <div>
+        <h2>Supervised libraries</h2>
+        <p class="metric-subtle">Pattern-learning runs and their saved DeepPHY evaluations.</p>
+      </div>
+      <span class="pill">{{ summary.supervised_libraries|length }}</span>
+    </div>
+    <div class="button-row">
+      <form id="supervised-compare-form" method="get" action="/env/{{ summary.env_id }}/compare"></form>
+      <button class="secondary-button" type="submit" form="supervised-compare-form">Compare selected</button>
+    </div>
+    {% if summary.supervised_libraries %}
+    <div class="metric-stack compact-metrics">
+      {% for run in summary.supervised_libraries %}
+      <div class="metric-row compact-row">
+        <div class="metric-main">
+          <div class="metric-title"><a href="/runs/{{ summary.env_id }}/{{ run.run_id }}">{{ run.run_id }}</a></div>
+          <div class="metric-subtle">{{ run.label_count }} labels · {{ run.candidate_count }} candidates{% if run.sample_count is not none %} · {{ run.sample_count }} samples{% endif %}</div>
+        </div>
+        <div class="job-inline-actions">
+          <label class="compare-pick">
+            <input type="checkbox" name="run_id" value="{{ run.run_id }}" form="supervised-compare-form">
+            <span>compare</span>
+          </label>
+          {% if run.average_score is not none %}
+          <span class="score">{{ "%.3f"|format(run.average_score) }}</span>
+          {% else %}
+          <span class="pill">saved</span>
+          {% endif %}
+          {% if run.evaluation_runs %}
+          <span class="pill">{{ "%.1f%%"|format(run.evaluation_runs[0].success_ratio * 100) if run.evaluation_runs[0].success_ratio is not none else "eval saved" }}</span>
+          {% else %}
+          <span class="pill status-failed">eval missing</span>
+          {% endif %}
+          <form method="post" action="/runs/{{ summary.env_id }}/{{ run.run_id }}/delete" onsubmit="return confirm('Delete supervised run {{ run.run_id }}? This removes the learned library, candidates, and evaluations.');">
+            <input type="hidden" name="next" value="/env/{{ summary.env_id }}/libraries">
+            <button class="secondary-button danger-button" type="submit">Delete</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">No supervised libraries found.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="card-topline">
+      <div>
+        <h2>Automatic libraries</h2>
+        <p class="metric-subtle">LLM-suggested label discovery runs and combined-library evaluations.</p>
+      </div>
+      <span class="pill">{{ summary.automatic_libraries|length }}</span>
+    </div>
+    {% if summary.automatic_libraries %}
+    <div class="metric-stack compact-metrics">
+      {% for run in summary.automatic_libraries %}
+      <div class="metric-row compact-row">
+        <div class="metric-main">
+          <div class="metric-title"><a href="/automatic/{{ summary.env_id }}/{{ run.run_id }}">{{ run.run_id }}</a></div>
+          <div class="metric-subtle">
+            {% if run.source_supervised_run_id %}
+            source <a href="/runs/{{ summary.env_id }}/{{ run.source_supervised_run_id }}">{{ run.source_supervised_run_id }}</a>
+            {% else %}
+            source unknown
+            {% endif %}
+            {% if run.source_evaluation_run_id %} · eval {{ run.source_evaluation_run_id }}{% endif %}
+            {% if run.proposed_labels %} · {{ run.proposed_labels|length }} proposed labels{% endif %}
+          </div>
+        </div>
+        <div class="job-inline-actions">
+          {% if run.evaluation_runs %}
+          <span class="score">
+            {{ "%.1f%%"|format(run.evaluation_runs[0].success_ratio * 100) if run.evaluation_runs[0].success_ratio is not none else "saved" }}
+          </span>
+          {% else %}
+          <span class="pill">learning</span>
+          {% endif %}
+          <form method="post" action="/automatic/{{ summary.env_id }}/{{ run.run_id }}/delete" onsubmit="return confirm('Delete automatic run {{ run.run_id }}? This removes the combined-library record and evaluations.');">
+            <input type="hidden" name="next" value="/env/{{ summary.env_id }}/libraries">
+            <button class="secondary-button danger-button" type="submit">Delete</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">No automatic libraries found.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="card-topline">
+      <div>
+        <h2>Unsupervised libraries</h2>
+        <p class="metric-subtle">Trace-only label proposal runs and their learned libraries.</p>
+      </div>
+      <span class="pill">{{ summary.unsupervised_libraries|length }}</span>
+    </div>
+    {% if summary.unsupervised_libraries %}
+    <div class="metric-stack compact-metrics">
+      {% for run in summary.unsupervised_libraries %}
+      <div class="metric-row compact-row">
+        <div class="metric-main">
+          <div class="metric-title"><a href="/unsupervised/{{ summary.env_id }}/{{ run.run_id }}">{{ run.run_id }}</a></div>
+          <div class="metric-subtle">
+            {% if run.proposed_labels %}{{ run.proposed_labels|length }} final labels{% endif %}
+            {% if run.evaluation_runs %} · {{ run.evaluation_runs|length }} evals{% endif %}
+          </div>
+        </div>
+        <div class="job-inline-actions">
+          {% if run.evaluation_runs %}
+          <span class="score">
+            {{ "%.1f%%"|format(run.evaluation_runs[0].success_ratio * 100) if run.evaluation_runs[0].success_ratio is not none else "saved" }}
+          </span>
+          {% else %}
+          <span class="pill">learning</span>
+          {% endif %}
+          <form method="post" action="/unsupervised/{{ summary.env_id }}/{{ run.run_id }}/delete" onsubmit="return confirm('Delete unsupervised run {{ run.run_id }}?');">
+            <input type="hidden" name="next" value="/env/{{ summary.env_id }}/libraries">
+            <button class="secondary-button danger-button" type="submit">Delete</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">No unsupervised libraries found.</p>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

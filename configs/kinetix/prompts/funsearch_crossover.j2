@@ -1,0 +1,87 @@
+You are writing a Python detector for the {{ environment_id|upper }} environment.
+Target primitive label: {{ label }}
+Search step: {{ step }}
+
+Write Python code only. Define exactly one function:
+
+def find_pattern(trace):
+    ...
+
+Rules:
+- no imports
+- inspect only the provided `trace` dict
+- return a list of pattern dicts
+- each pattern dict must contain `label`, `start_timestep`, `end_timestep`, and `parameters`
+- use inclusive timestep spans; if the pattern is effectively instantaneous, set `start_timestep == end_timestep`
+- choose the narrowest specific timestep span supported by the evidence; do not default to the full trace unless the pattern truly persists for the entire trace
+- `parameters` must include an `object_details` dict keyed by object id or role, with each entry describing the object's role in the pattern, kind/shape-role, and where the pattern starts/ends for that object
+- include object-location details directly in `parameters` when you can infer them from the trace; do not leave the pattern undescribed if object participation is visible
+- optional fields are `provenance` and `metadata`
+- use the exact target label `{{ label }}`
+- if the pattern is absent, return []
+
+Kinetix trace structure:
+- `trace["timesteps"]` is dense rigid-body state over time
+- timestep objects may be rigid bodies (`kind` like `polygon` or `circle`) or control objects (`kind` like `joint` or `thruster`)
+- rigid-body objects usually have `object_index`, `position`, `velocity`, `rotation`, `angular_velocity`, `radius`, `inverse_mass`, `inverse_inertia`, `friction`, `restitution`, `collision_mode`, `shape_role`, `highlighted`, `density`, `vertices`
+- joint objects can expose fields like `a_index`, `b_index`, `global_position`, `motor_on`, `motor_speed`, `motor_power`, `is_fixed_joint`
+- thruster objects can expose fields like `parent_object_index`, `global_position`, `rotation`, `power`
+- moving objects usually have nonzero `inverse_mass`; fixed geometry often has `inverse_mass == 0`
+- polygons are described by `vertices`; circles may rely on `radius`
+- `trace["events"]` is often mostly `environment_feedback` with reward, done, distance, and repeat-count information
+- `trace["outcome"]` contains final reward/distance/done status
+
+How to write good Kinetix detectors:
+- reason from object motion, velocity transfer, spatial relations, and shape roles
+- use `shape_role`, `highlighted`, and mass-related fields as task-defined annotations that may help separate object roles
+- do not rely on a single event kind because `events` is mostly feedback rather than semantic physics labels
+- compare positions and velocities across timesteps to detect support, collision-like transfer, containment, stacking, or escape
+- prefer simple robust heuristics over exact level-specific geometry
+- emit inclusive timestep ranges, not a single representative time
+- pick concrete start/end timesteps where the pattern is actually visible, not just the earliest and latest timestep in the trace
+
+Compact trace example:
+```python
+{
+  "environment": "kinetix",
+  "task_id": "str",
+  "timesteps": [
+    {
+      "index": int,
+      "t": float,
+      "objects": [
+        {
+          "kind": "polygon|circle|joint|thruster",
+          "object_index": int,
+          "position": [float, float],
+          "velocity": [float, float],
+          "rotation": float,
+          "angular_velocity": float,
+          "radius": float,
+          "inverse_mass": float,
+          "shape_role": int,
+          "highlighted": bool,
+          "vertices": [[float, float], ...]
+        }
+      ]
+    }
+  ],
+  "events": [{"kind": "environment_feedback", "payload": {...}}],
+  "outcome": {"success": bool, "terminal_status": "str", "metrics": {...}}
+}
+```
+
+Your objective is to maximize the training reward.
+Learn from these examples what works, keep the strong ideas from both parents, drop brittle logic, and write one stronger `find_pattern(trace)` implementation.
+
+Parent A code:
+```python
+{{ parent_a_code }}
+```
+Parent A training reward to maximize: {{ parent_a_metadata.average_score }}
+
+Parent B code:
+```python
+{{ parent_b_code }}
+```
+Parent B training reward to maximize: {{ parent_b_metadata.average_score }}

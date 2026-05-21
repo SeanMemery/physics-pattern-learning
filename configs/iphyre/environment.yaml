@@ -1,0 +1,61 @@
+env_id: iphyre
+display_name: I-PHYRE
+execution_mode: simulator
+upstream:
+  root: .
+  runner: src/adapters/iphyre.py
+  config: src/vendor/deepphy_prompts/configs/env_config_02_iphyre.json
+  assets:
+    - src/vendor/iphyre/simulator.py
+runtime:
+  - kind: python
+    name: Python runtime
+    value: "3.10"
+    interpreter_path: venv/iphyre/bin/python
+    required: true
+  - kind: module
+    name: I-PHYRE package
+    value: iphyre
+    required: true
+  - kind: file
+    name: I-PHYRE adapter
+    path: src/adapters/iphyre.py
+    required: true
+  - kind: file
+    name: Patched simulator asset
+    path: src/vendor/iphyre/simulator.py
+    required: true
+  - kind: file
+    name: I-PHYRE config
+    path: src/vendor/deepphy_prompts/configs/env_config_02_iphyre.json
+    required: true
+    notes: Local vendored simulator patch retained for parity with the original benchmark runtime.
+native_metric:
+  name: reward_threshold
+  kind: reward
+  success_field: reward>=solved_threshold
+  notes: Native result combines total reward with solved threshold.
+capabilities:
+  - name: task_inventory
+    status: supported
+    detail: Task ids come from the I-PHYRE game list.
+  - name: direct_simulator_state
+    status: supported
+    detail: Runner converts actions into simulator calls and can export frame sequences.
+  - name: patched_runtime_dependency
+    status: partial
+    detail: Full parity requires the locally vendored patched simulator file.
+task_contract:
+  action_space:
+    kind: timed_block_elimination
+    format: list of block indices with execution timestamps
+  observation:
+    kind: image_sequence
+    format: initial image plus selected simulation frames
+  trace:
+    step_unit: fixed fps timestep
+    attachments:
+      - images
+      - selected_frames
+notes:
+  - Tracks best reward across attempts and treats solved-threshold crossing as success.

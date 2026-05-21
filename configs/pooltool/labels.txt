@@ -1,0 +1,12 @@
+cue strike
+ball collision
+cushion rebound
+ball pocketed
+rolling ball
+sliding ball
+spinning ball
+ball slowing
+ball separation
+ball curves around ball
+high angle collision
+gentle touch

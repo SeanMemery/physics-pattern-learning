@@ -1,0 +1,12 @@
+moving object hits stationary object
+near collision
+support relationship
+lose support
+falling object
+rolling object
+sliding contact
+airborne motion
+bounce
+grid cell transition
+wedged
+tip over

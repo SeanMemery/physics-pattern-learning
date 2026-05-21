@@ -1,0 +1,41 @@
+Repair the {{ environment_id|upper }} detector candidate for the target label `{{ label }}`.
+
+Return Python code only with exactly one function:
+
+def find_pattern(trace):
+    ...
+
+Constraints:
+- no imports
+- inspect only the provided `trace` dict
+- return a list of pattern dicts
+- every emitted pattern must include `label`, `start_timestep`, `end_timestep`, and `parameters`
+- use inclusive timestep spans; if the pattern is point-like, set `start_timestep == end_timestep`
+- choose the narrowest specific timestep span supported by the evidence; do not default to the full trace unless the pattern truly persists for the entire trace
+- `parameters` must include an `object_details` dict keyed by object id or role, with each entry describing the object's role in the pattern, ball identity/kind, and where the pattern starts/ends for that object
+- use the exact target label `{{ label }}`
+- preserve the detector intent unless the validation error requires structural change
+
+Pooltool reminder:
+- `trace["events"]` is often the best source for discrete shot physics
+- timestep objects are billiard balls keyed by `ball_id`
+- use x-y motion from `position` / `velocity` for sustained trajectory reasoning
+- motion-state transitions can be more reliable than ad hoc numeric thresholds
+- repair detectors so they emit timestep spans, not wall-clock times
+- repair detectors so they pick concrete evidence-backed start/end timesteps, not the entire trace by default
+
+Compact trace example:
+```python
+{"timesteps": [{"objects": [{"ball_id": "str", "position": [float, float, float], "velocity": [float, float, float], "motion_state": "str"}]}], "events": [{"kind": "physics_ball_ball"}], "outcome": {"success": bool, "terminal_status": "str"}}
+```
+
+Validation error:
+- category={{ error_category }}
+- message={{ error_message }}
+- line={{ error_line }}
+- column={{ error_column }}
+
+Broken candidate:
+```python
+{{ broken_code }}
+```

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / <a href="/env/{{ env_id }}">{{ env_id }}</a> / <a href="/runs/{{ env_id }}/{{ run_id }}">{{ run_id }}</a> / <a href="/runs/{{ env_id }}/{{ run_id }}/labels/{{ label_name }}">{{ label_name }}</a> / {{ candidate.name }}</p>
+  <h1>{{ candidate.name }}</h1>
+  <p>Learned detector code for {{ label_name }}, with search reward context and candidate metadata.</p>
+  {% if parent_candidates %}
+  <div class="button-row">
+    <a class="secondary-button" href="/runs/{{ env_id }}/{{ run_id }}/labels/{{ label_name }}/candidates/{{ candidate.name }}/diff">Open parent diff</a>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Candidate snapshot</h2>
+  <p class="metric-subtle">These values summarize how this candidate performed during search. Average reward is the train-side reward used for ranking; validation reward is the held-out check.</p>
+  <div class="metric-stack">
+    <div class="metric-row"><span>Average reward</span><strong>{{ "%.3f"|format(candidate.average_score) if candidate.average_score is not none else "—" }}</strong></div>
+    <div class="metric-row"><span>Train reward</span><strong>{{ "%.3f"|format(candidate.train_score) if candidate.train_score is not none else "—" }}</strong></div>
+    <div class="metric-row"><span>Validation reward</span><strong>{{ "%.3f"|format(candidate.val_score) if candidate.val_score is not none else "—" }}</strong></div>
+    <div class="metric-row"><span>UID</span><strong>{{ candidate.uid or "—" }}</strong></div>
+    <div class="metric-row"><span>Origin</span><strong>{{ candidate.origin or "—" }}</strong></div>
+    <div class="metric-row">
+      <span>Parents</span>
+      <strong>
+        {% if parent_candidates %}
+          {% for parent in parent_candidates %}
+            {% if not loop.first %} · {% endif %}
+            <a href="/runs/{{ env_id }}/{{ run_id }}/labels/{{ label_name }}/candidates/{{ parent.name }}">{{ parent.uid or parent.name }}</a>
+          {% endfor %}
+        {% elif candidate.parent_uid or candidate.secondary_parent_uid %}
+          {{ candidate.parent_uid or "—" }}{% if candidate.secondary_parent_uid %} · {{ candidate.secondary_parent_uid }}{% endif %}
+        {% else %}
+          —
+        {% endif %}
+      </strong>
+    </div>
+    {% if parent_candidates %}
+    <div class="metric-row"><span>Diff</span><strong><a href="/runs/{{ env_id }}/{{ run_id }}/labels/{{ label_name }}/candidates/{{ candidate.name }}/diff">Compare against parents</a></strong></div>
+    {% endif %}
+    <div class="metric-row"><span>Iteration</span><strong>{{ candidate.iteration if candidate.iteration is not none else "—" }}</strong></div>
+  </div>
+</section>
+
+<section class="panel code-panel">
+  <h2>Detector source</h2>
+  <p class="metric-subtle">This is the exact Python source that was executed to score this candidate.</p>
+  <pre class="code-block"><code>{{ code }}</code></pre>
+</section>
+{% endblock %}

@@ -1,0 +1,17 @@
+{
+  "expectations_version": "1",
+  "fixtures": [
+    {
+      "env_id": "pooltool",
+      "task_id": "fixture-pooltool",
+      "expected_outcome": {
+        "task_name": "nine_ball_success",
+        "success": true,
+        "terminal_status": "9_BALL_POTTED"
+      },
+      "expected_metrics": {
+        "nine_ball_success": true
+      }
+    }
+  ]
+}

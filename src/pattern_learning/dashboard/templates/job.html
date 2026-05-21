@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="breadcrumb"><a href="/">Home</a> / job / {{ job.job_id }}</p>
+  <h1>Job {{ job.job_id }}</h1>
+  <p>Live status and captured output for background dashboard jobs.</p>
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <span class="stat-label">State</span>
+      <strong class="stat-value">{{ job.status }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Action</span>
+      <strong class="stat-value">{{ job.name }}</strong>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Exit code</span>
+      <strong class="stat-value">{{ job.exit_code if job.exit_code is not none else "—" }}</strong>
+    </div>
+  </div>
+</section>
+
+{% set can_resume = job.metadata.get("supports_pause") or job.metadata.get("resume_argv") %}
+<div class="button-row job-inline-actions">
+  <span class="pill status-{{ job.status }}" id="job-status-chip">{{ job.status }}</span>
+  {% if job.metadata.get("supports_pause") and job.status in ["queued", "running"] %}
+  <form method="post" action="/jobs/{{ job.job_id }}/pause">
+    <input type="hidden" name="next" value="/jobs/{{ job.job_id }}">
+    <button class="secondary-button" type="submit">Pause</button>
+  </form>
+  {% elif can_resume and job.status == "paused" %}
+  <form method="post" action="/jobs/{{ job.job_id }}/resume">
+    <input type="hidden" name="next" value="/jobs/{{ job.job_id }}">
+    <button class="secondary-button" type="submit">Unpause</button>
+  </form>
+  {% elif can_resume and job.status == "failed" %}
+  <form method="post" action="/jobs/{{ job.job_id }}/resume">
+    <input type="hidden" name="next" value="/jobs/{{ job.job_id }}">
+    <button class="secondary-button" type="submit">Resume failed run</button>
+  </form>
+  {% endif %}
+  {% if job.metadata.get("queue_requested") and can_resume and job.status in ["running", "paused"] %}
+  <form method="post" action="/jobs/{{ job.job_id }}/requeue">
+    <input type="hidden" name="next" value="/jobs/{{ job.job_id }}">
+    <button class="secondary-button" type="submit">Requeue</button>
+  </form>
+  {% endif %}
+  {% if job.status == "paused" %}
+  <form method="post" action="/jobs/{{ job.job_id }}/exit">
+    <input type="hidden" name="next" value="/">
+    <button class="secondary-button danger-button" type="submit">Exit paused job</button>
+  </form>
+  {% elif job.status == "failed" %}
+  <form method="post" action="/jobs/{{ job.job_id }}/clear">
+    <input type="hidden" name="next" value="/">
+    <button class="secondary-button danger-button" type="submit">Clear failed job</button>
+  </form>
+  {% elif job.status == "succeeded" %}
+  <form method="post" action="/jobs/{{ job.job_id }}/clear">
+    <input type="hidden" name="next" value="/">
+    <button class="secondary-button" type="submit">Clear completed job</button>
+  </form>
+  {% endif %}
+</div>
+
+<section class="content-grid">
+  <section class="panel">
+    <h2>Status</h2>
+    <div class="metric-stack">
+      <div class="metric-row"><span>Name</span><strong id="job-name">{{ job.name }}</strong></div>
+      <div class="metric-row"><span>State</span><strong id="job-status">{{ job.status }}</strong></div>
+      <div class="metric-row"><span>Created</span><strong>{{ display_time(job.created_at) }}</strong></div>
+      <div class="metric-row"><span>Started</span><strong id="job-started">{{ display_time(job.started_at) }}</strong></div>
+      <div class="metric-row"><span>Finished</span><strong id="job-finished">{{ display_time(job.finished_at) }}</strong></div>
+      <div class="metric-row"><span>Exit code</span><strong id="job-exit">{{ job.exit_code if job.exit_code is not none else "—" }}</strong></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Command</h2>
+    <pre class="code-block" id="job-command">{{ job.argv | join(' ') }}</pre>
+  </section>
+
+  {% if job.resource_metrics %}
+  <section class="panel">
+    <h2>Resources</h2>
+    <div class="metric-stack compact-metric-stack">
+      <div class="metric-row"><span>Last sample</span><strong id="job-resource-updated">{{ job.resource_metrics.updated_at_display }}</strong></div>
+      <div class="metric-row"><span>Current RAM</span><strong id="job-resource-current-rss">{{ job.resource_metrics.current_rss_display }}</strong></div>
+      <div class="metric-row"><span>Peak RAM</span><strong id="job-resource-peak-rss">{{ job.resource_metrics.peak_rss_display }}</strong></div>
+      <div class="metric-row"><span>Low free RAM</span><strong id="job-resource-min-mem">{{ job.resource_metrics.min_mem_available_display }}</strong></div>
+      <div class="metric-row"><span>Current VRAM</span><strong id="job-resource-current-vram">{{ job.resource_metrics.current_gpu_vram_display }}</strong></div>
+      <div class="metric-row"><span>Peak VRAM</span><strong id="job-resource-peak-vram">{{ job.resource_metrics.peak_gpu_vram_display }}</strong></div>
+      <div class="metric-row"><span>Peak GPU temp</span><strong id="job-resource-gpu-temp">{{ job.resource_metrics.peak_gpu_temp_display }}</strong></div>
+      <div class="metric-row"><span>Peak CPU temp</span><strong id="job-resource-cpu-temp">{{ job.resource_metrics.peak_cpu_temp_display }}</strong></div>
+    </div>
+    <p class="metric-subtle">Sampled every 5 seconds while the job is running. Use this to spot RAM, VRAM, or thermal spikes before a kill.</p>
+  </section>
+  {% endif %}
+
+  {% if job.status == "failed" and job.failure_resource_snapshot %}
+  <section class="panel">
+    <h2>Failure snapshot</h2>
+    <div class="metric-stack compact-metric-stack">
+      <div class="metric-row"><span>Captured</span><strong id="job-failure-captured">{{ job.failure_resource_snapshot.captured_at_display }}</strong></div>
+      <div class="metric-row"><span>Job RAM</span><strong id="job-failure-rss">{{ job.failure_resource_snapshot.process_rss_display }}</strong></div>
+      <div class="metric-row"><span>System RAM used</span><strong id="job-failure-mem-used">{{ job.failure_resource_snapshot.system_mem_used_display }}</strong></div>
+      <div class="metric-row"><span>Free RAM</span><strong id="job-failure-mem-available">{{ job.failure_resource_snapshot.system_mem_available_display }}</strong></div>
+      <div class="metric-row"><span>GPU VRAM</span><strong id="job-failure-vram">{{ job.failure_resource_snapshot.gpu_vram_display }}</strong></div>
+    </div>
+    <p class="metric-subtle">Captured immediately after the failing exit so you can spot RAM or VRAM pressure near the kill point.</p>
+  </section>
+  {% endif %}
+</section>
+
+{% if learning_progress %}
+  {% with evolution_run=learning_progress.run_detail, evolution_settings=learning_progress.settings, evolution_run_url=learning_progress.run_url, evolution_base_url='/jobs/' ~ job.job_id, evolution_query_prefix='?' %}
+    {% include "_evolution_panel.html" %}
+  {% endwith %}
+{% endif %}
+
+{% if dataset_progress %}
+<section class="panel">
+  <h2>Current dataset</h2>
+  <div class="metric-stack">
+    <div class="metric-row"><span>Environment</span><strong id="dataset-env">{{ dataset_progress.env_id }}</strong></div>
+    <div class="metric-row"><span>Dataset</span><strong id="dataset-name">{{ dataset_progress.dataset_name }}</strong></div>
+    <div class="metric-row"><span>Root</span><strong class="truncate" id="dataset-root">{{ dataset_progress.dataset_root }}</strong></div>
+    <div class="metric-row"><span>Completed</span><strong id="dataset-total">{% if dataset_progress.target_total_count %}{{ dataset_progress.total_completed_count }} / {{ dataset_progress.target_total_count }}{% else %}{{ dataset_progress.total_completed_count }}{% endif %}</strong></div>
+  </div>
+  {% if dataset_progress.target_total_count %}
+  <div class="progress-block">
+    <div class="progress-meta">
+      <span>dataset coverage</span>
+      <strong id="dataset-progress-percent">{{ "%.1f%%"|format((dataset_progress.total_completed_count / dataset_progress.target_total_count) * 100) }}</strong>
+    </div>
+    <div class="progress-track">
+      <span class="progress-fill" id="dataset-progress-fill" style="width: {{ "%.2f"|format((dataset_progress.total_completed_count / dataset_progress.target_total_count) * 100) }}%"></span>
+    </div>
+  </div>
+  {% endif %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Split</th>
+        <th>Completed</th>
+        <th>Target</th>
+        <th>Manifest</th>
+      </tr>
+    </thead>
+    <tbody id="dataset-progress-body">
+      {% for split in dataset_progress.splits %}
+      <tr>
+        <td>{{ split.name }}</td>
+        <td>{{ split.completed_count }}</td>
+        <td>{{ split.target_count if split.target_count is not none else "—" }}</td>
+        <td>{{ split.manifest_completed_count if split.manifest_completed_count is not none else "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>Recent output</h2>
+  <pre class="log-block" id="job-output">{% for line in job.recent_output %}{{ line }}
+{% endfor %}</pre>
+  <p class="metric-subtle">Polling {{ poll_url }} every 5 seconds while the job is queued or running.</p>
+</section>
+
+<script>
+  (() => {
+    const pollUrl = {{ poll_url | tojson }};
+    const pollIntervalMs = 5000;
+    const statusEl = document.getElementById("job-status");
+    const statusChipEl = document.getElementById("job-status-chip");
+    const startedEl = document.getElementById("job-started");
+    const finishedEl = document.getElementById("job-finished");
+    const exitEl = document.getElementById("job-exit");
+    const outputEl = document.getElementById("job-output");
+    const datasetTotalEl = document.getElementById("dataset-total");
+    const datasetProgressBodyEl = document.getElementById("dataset-progress-body");
+    const datasetProgressPercentEl = document.getElementById("dataset-progress-percent");
+    const datasetProgressFillEl = document.getElementById("dataset-progress-fill");
+    const resourceUpdatedEl = document.getElementById("job-resource-updated");
+    const resourceCurrentRssEl = document.getElementById("job-resource-current-rss");
+    const resourcePeakRssEl = document.getElementById("job-resource-peak-rss");
+    const resourceMinMemEl = document.getElementById("job-resource-min-mem");
+    const resourceCurrentVramEl = document.getElementById("job-resource-current-vram");
+    const resourcePeakVramEl = document.getElementById("job-resource-peak-vram");
+    const resourceGpuTempEl = document.getElementById("job-resource-gpu-temp");
+    const resourceCpuTempEl = document.getElementById("job-resource-cpu-temp");
+    const failureCapturedEl = document.getElementById("job-failure-captured");
+    const failureRssEl = document.getElementById("job-failure-rss");
+    const failureMemUsedEl = document.getElementById("job-failure-mem-used");
+    const failureMemAvailableEl = document.getElementById("job-failure-mem-available");
+    const failureVramEl = document.getElementById("job-failure-vram");
+    let learningRefreshToken = {{ learning_progress.refresh_token|tojson if learning_progress else 'null' }};
+
+    function updateDatasetProgress(datasetProgress) {
+      if (!datasetProgress || !datasetTotalEl || !datasetProgressBodyEl) {
+        return;
+      }
+      if (datasetProgress.target_total_count !== null && datasetProgress.target_total_count !== undefined) {
+        datasetTotalEl.textContent = `${datasetProgress.total_completed_count} / ${datasetProgress.target_total_count}`;
+      } else {
+        datasetTotalEl.textContent = String(datasetProgress.total_completed_count);
+      }
+      const splits = datasetProgress.splits || [];
+      datasetProgressBodyEl.innerHTML = splits.map((split) => `
+        <tr>
+          <td>${split.name}</td>
+          <td>${split.completed_count}</td>
+          <td>${split.target_count ?? "—"}</td>
+          <td>${split.manifest_completed_count ?? "—"}</td>
+        </tr>
+      `).join("");
+      if (datasetProgressPercentEl && datasetProgressFillEl && datasetProgress.target_total_count) {
+        const pct = (datasetProgress.total_completed_count / datasetProgress.target_total_count) * 100;
+        datasetProgressPercentEl.textContent = `${pct.toFixed(1)}%`;
+        datasetProgressFillEl.style.width = `${pct.toFixed(2)}%`;
+      }
+    }
+
+    function updateResourceMetrics(resourceMetrics) {
+      if (!resourceMetrics || !resourceUpdatedEl) {
+        return;
+      }
+      resourceUpdatedEl.textContent = resourceMetrics.updated_at_display || "—";
+      if (resourceCurrentRssEl) resourceCurrentRssEl.textContent = resourceMetrics.current_rss_display || "—";
+      if (resourcePeakRssEl) resourcePeakRssEl.textContent = resourceMetrics.peak_rss_display || "—";
+      if (resourceMinMemEl) resourceMinMemEl.textContent = resourceMetrics.min_mem_available_display || "—";
+      if (resourceCurrentVramEl) resourceCurrentVramEl.textContent = resourceMetrics.current_gpu_vram_display || "—";
+      if (resourcePeakVramEl) resourcePeakVramEl.textContent = resourceMetrics.peak_gpu_vram_display || "—";
+      if (resourceGpuTempEl) resourceGpuTempEl.textContent = resourceMetrics.peak_gpu_temp_display || "—";
+      if (resourceCpuTempEl) resourceCpuTempEl.textContent = resourceMetrics.peak_cpu_temp_display || "—";
+    }
+
+    function updateFailureSnapshot(failureSnapshot) {
+      if (!failureCapturedEl) {
+        return;
+      }
+      failureCapturedEl.textContent = failureSnapshot?.captured_at_display || "—";
+      if (failureRssEl) failureRssEl.textContent = failureSnapshot?.process_rss_display || "—";
+      if (failureMemUsedEl) failureMemUsedEl.textContent = failureSnapshot?.system_mem_used_display || "—";
+      if (failureMemAvailableEl) failureMemAvailableEl.textContent = failureSnapshot?.system_mem_available_display || "—";
+      if (failureVramEl) failureVramEl.textContent = failureSnapshot?.gpu_vram_display || "—";
+    }
+
+    async function poll() {
+      try {
+        if (document.hidden) {
+          setTimeout(poll, pollIntervalMs);
+          return;
+        }
+        const response = await fetch(pollUrl, { cache: "no-store" });
+        if (!response.ok) {
+          return;
+        }
+        const job = await response.json();
+        statusEl.textContent = job.status;
+        if (statusChipEl) {
+          statusChipEl.textContent = job.status;
+          statusChipEl.className = `pill status-${job.status}`;
+        }
+        startedEl.textContent = job.started_at_display || "—";
+        finishedEl.textContent = job.finished_at_display || "—";
+        exitEl.textContent = job.exit_code === null ? "—" : String(job.exit_code);
+        outputEl.textContent = (job.recent_output || []).join("\n");
+        updateDatasetProgress(job.dataset_progress);
+        updateResourceMetrics(job.resource_metrics);
+        updateFailureSnapshot(job.failure_resource_snapshot);
+        if (job.learning_progress && job.learning_progress.refresh_token !== learningRefreshToken) {
+          window.location.reload();
+          return;
+        }
+        if (job.status === "queued" || job.status === "running") {
+          setTimeout(poll, pollIntervalMs);
+        }
+      } catch (_error) {
+        setTimeout(poll, pollIntervalMs);
+      }
+    }
+
+    if (statusEl.textContent === "queued" || statusEl.textContent === "running") {
+      setTimeout(poll, pollIntervalMs);
+    }
+  })();
+</script>
+{% endblock %}

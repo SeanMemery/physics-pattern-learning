@@ -1,0 +1,58 @@
+env_id: phyre
+display_name: PHYRE
+execution_mode: simulator
+upstream:
+  root: .
+  runner: src/tooling/phyre_trace_helper_py39.py
+  config: src/vendor/deepphy_prompts/configs/env_config_01_phyre.json
+  assets: []
+runtime:
+  - kind: python
+    name: Python runtime
+    value: "3.9"
+    interpreter_path: venv/phyre/bin/python
+    required: true
+  - kind: file
+    name: PHYRE helper interpreter
+    path: venv/phyre/bin/python
+    required: true
+    notes: The PHYRE virtualenv must provide Python 3.9.
+  - kind: file
+    name: PHYRE trace helper
+    path: src/tooling/phyre_trace_helper_py39.py
+    required: true
+  - kind: file
+    name: PHYRE config
+    path: src/vendor/deepphy_prompts/configs/env_config_01_phyre.json
+    required: true
+native_metric:
+  name: solved_status
+  kind: success
+  success_field: is_solved
+  notes: Native outcome is taken from PHYRE simulator status.
+capabilities:
+  - name: task_inventory
+    status: supported
+    detail: PHYRE tasks come from fold-based simulator task ids.
+  - name: direct_simulator_state
+    status: supported
+    detail: Runner has direct simulator access and can save keyframes.
+  - name: gui_automation
+    status: unsupported
+    detail: No GUI automation required.
+task_contract:
+  action_space:
+    kind: placement
+    format: discrete grid cell plus radius
+    shape:
+      - 3
+  observation:
+    kind: image
+    format: initial scene plus grid overlay and keyframes
+  trace:
+    step_unit: simulation frame
+    attachments:
+      - images
+      - keyframes
+notes:
+  - Stores solved status per attempt and supports simulator image export through the local PHYRE helper.

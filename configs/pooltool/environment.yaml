@@ -1,0 +1,55 @@
+env_id: pooltool
+display_name: Pooltool
+execution_mode: simulator
+upstream:
+  root: .
+  runner: src/adapters/pooltool.py
+  config: src/vendor/deepphy_prompts/configs/env_config_04_pooltool.json
+  assets: []
+runtime:
+  - kind: python
+    name: Python runtime
+    value: "3.10"
+    interpreter_path: venv/pooltool/bin/python
+    required: true
+  - kind: module
+    name: Pooltool package
+    value: pooltool
+    required: true
+  - kind: file
+    name: Pooltool adapter
+    path: src/adapters/pooltool.py
+    required: true
+  - kind: file
+    name: Pooltool config
+    path: src/vendor/deepphy_prompts/configs/env_config_04_pooltool.json
+    required: true
+native_metric:
+  name: nine_ball_success
+  kind: success
+  success_field: 9_BALL_POTTED
+  notes: Native success is defined by potting the 9-ball.
+capabilities:
+  - name: task_inventory
+    status: supported
+    detail: Games are generated programmatically from a 9-ball setup.
+  - name: direct_simulator_state
+    status: supported
+    detail: Runner can inspect ball positions and pocket events directly.
+  - name: solver_stability
+    status: partial
+    detail: The current adapter already guards against a known root-solver crash case.
+task_contract:
+  action_space:
+    kind: shot_selection
+    format: speed name plus strike-spot name
+  observation:
+    kind: table_state
+    format: rendered table image and remaining balls
+  trace:
+    step_unit: shot attempt
+    attachments:
+      - table_images
+      - potted_ball_events
+notes:
+  - Cue-ball repositioning and potted-ball event filtering are already explicit in the runner logic.

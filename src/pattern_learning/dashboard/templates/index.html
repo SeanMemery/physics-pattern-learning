@@ -1,0 +1,650 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="home-main-column">
+  <section class="panel compact-panel">
+    <div class="card-topline">
+      <div>
+        <h2>PoolTool reward programs</h2>
+        <p class="metric-subtle">Synthesize a DSL reward from a natural-language goal, optimize actions on random scenes, and run the value-model experiment from the paper adaptation.</p>
+      </div>
+      <a class="primary-button" href="/pooltool/reward-programs">Open page</a>
+    </div>
+  </section>
+
+  <section class="panel compact-panel infrastructure-panel">
+    <div class="card-topline infrastructure-topline">
+      <h2>
+        Infrastructure
+        <span class="infrastructure-updated-inline" id="infrastructure-updated">
+          Updated {{ system_resources.timestamp_display }}
+        </span>
+      </h2>
+    </div>
+    <div class="system-resources-grid system-resources-row">
+      <article class="system-resource-tile system-resource-util-tile">
+        <div class="system-resource-head">
+          <span class="section-label">CPU</span>
+          <strong class="system-resource-percent" id="system-cpu-percent">
+            {{ system_resources.cpu.percent_display if system_resources.cpu.available else "—" }}
+          </strong>
+        </div>
+        <div class="progress-track compact-progress-track">
+          <span class="progress-fill system-resource-fill cpu-fill" id="system-cpu-fill" style="width: {% if system_resources.cpu.available %}{{ "%.2f"|format(system_resources.cpu.percent) }}{% else %}0{% endif %}%"></span>
+        </div>
+      </article>
+      <article class="system-resource-tile system-resource-util-tile">
+        <div class="system-resource-head">
+          <span class="section-label">GPU</span>
+          <strong class="system-resource-percent" id="system-gpu-percent">
+            {{ system_resources.gpu.percent_display if system_resources.gpu.available else "—" }}
+          </strong>
+        </div>
+        <div class="progress-track compact-progress-track">
+          <span class="progress-fill system-resource-fill gpu-fill" id="system-gpu-fill" style="width: {% if system_resources.gpu.available %}{{ "%.2f"|format(system_resources.gpu.percent) }}{% else %}0{% endif %}%"></span>
+        </div>
+      </article>
+      <article class="system-resource-tile">
+        <div class="system-resource-head">
+          <span class="section-label">RAM</span>
+          <strong class="system-resource-percent" id="system-ram-percent">
+            {% if system_resources.ram.available %}{{ "%.1f%%"|format(system_resources.ram.percent) }}{% else %}—{% endif %}
+          </strong>
+        </div>
+        <div class="progress-track compact-progress-track">
+          <span class="progress-fill system-resource-fill" id="system-ram-fill" style="width: {% if system_resources.ram.available %}{{ "%.2f"|format(system_resources.ram.percent) }}{% else %}0{% endif %}%"></span>
+        </div>
+        <div class="system-resource-meta">
+          <strong id="system-ram-used">{{ system_resources.ram.used_display if system_resources.ram.available else "—" }}</strong>
+          <span id="system-ram-total">/ {{ system_resources.ram.total_display if system_resources.ram.available else "—" }}</span>
+        </div>
+      </article>
+      <article class="system-resource-tile">
+        <div class="system-resource-head">
+          <span class="section-label">VRAM</span>
+          <strong class="system-resource-percent" id="system-vram-percent">
+            {% if system_resources.vram.available %}{{ "%.1f%%"|format(system_resources.vram.percent) }}{% else %}—{% endif %}
+          </strong>
+        </div>
+        <div class="progress-track compact-progress-track">
+          <span class="progress-fill system-resource-fill gpu-fill" id="system-vram-fill" style="width: {% if system_resources.vram.available %}{{ "%.2f"|format(system_resources.vram.percent) }}{% else %}0{% endif %}%"></span>
+        </div>
+        <div class="system-resource-meta">
+          <strong id="system-vram-used">{{ system_resources.vram.used_display if system_resources.vram.available else "—" }}</strong>
+          <span id="system-vram-total">/ {{ system_resources.vram.total_display if system_resources.vram.available else "—" }}</span>
+        </div>
+      </article>
+      <article class="system-resource-tile system-resource-temp-tile">
+        <div class="system-resource-head">
+          <span class="section-label">Temp</span>
+          <strong class="system-resource-percent" id="system-temp-value">
+            {{ system_resources.temperature.hottest_display if system_resources.temperature.available else "—" }}
+          </strong>
+        </div>
+        <div class="system-resource-meta system-resource-temp-meta">
+          <strong id="system-temp-cpu">CPU {{ system_resources.temperature.cpu_display if system_resources.temperature.available else "—" }}</strong>
+          <span id="system-temp-gpu">GPU {{ system_resources.temperature.gpu_display if system_resources.temperature.available else "—" }}</span>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="panel compact-panel">
+    <div id="queue-panel-container" data-queue-panel-url="/queue-panel" data-queue-panel-version-url="/queue-panel-version" data-queue-panel-data-url="/queue-panel-data">
+      {% include "_queue_panel.html" %}
+    </div>
+  </section>
+
+  <section class="panel compact-panel">
+    <div class="card-topline">
+      <div>
+        <h2>Recent runs</h2>
+      </div>
+    </div>
+    <div id="recent-runs-panel" data-recent-runs-url="/recent-runs" data-recent-runs-version-url="/recent-runs-version" data-recent-runs-data-url="/recent-runs-data">
+      {% include "_recent_runs_panel.html" %}
+    </div>
+  </section>
+</div>
+
+<script>
+  (() => {
+    const DEFAULT_INTERACTION_IDLE_MS = 4000;
+
+    function scheduleNextPoll(baseIntervalMs) {
+      const jitter = 0.85 + (Math.random() * 0.3);
+      const hiddenMultiplier = document.hidden ? 2.0 : 1.0;
+      return Math.round(baseIntervalMs * jitter * hiddenMultiplier);
+    }
+
+    function markPanelInteraction(panel, idleMs = DEFAULT_INTERACTION_IDLE_MS) {
+      if (!panel) {
+        return;
+      }
+      panel.dataset.interactingUntil = String(Date.now() + idleMs);
+    }
+
+    function fieldHasUnsavedValue(field) {
+      if (!(field instanceof HTMLElement) || field.hasAttribute("disabled")) {
+        return false;
+      }
+      if (field instanceof HTMLInputElement) {
+        const type = (field.type || "text").toLowerCase();
+        if (["hidden", "submit", "button", "reset"].includes(type)) {
+          return false;
+        }
+        if (type === "checkbox" || type === "radio") {
+          return field.checked !== field.defaultChecked;
+        }
+        return field.value !== field.defaultValue;
+      }
+      if (field instanceof HTMLTextAreaElement) {
+        return field.value !== field.defaultValue;
+      }
+      if (field instanceof HTMLSelectElement) {
+        const defaultOption = Array.from(field.options).find((option) => option.defaultSelected);
+        const defaultValue = defaultOption ? defaultOption.value : (field.options[0]?.value || "");
+        return field.value !== defaultValue;
+      }
+      return false;
+    }
+
+    function panelHasUnsavedChanges(panel) {
+      if (!panel) {
+        return false;
+      }
+      return Array.from(panel.querySelectorAll("input, textarea, select")).some((field) =>
+        fieldHasUnsavedValue(field),
+      );
+    }
+
+    function panelInteractionActive(panel) {
+      if (!panel) {
+        return false;
+      }
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLElement && panel.contains(activeElement)) {
+        return true;
+      }
+      const interactingUntil = Number(panel.dataset.interactingUntil || "0");
+      return Number.isFinite(interactingUntil) && interactingUntil > Date.now();
+    }
+
+    function bindPanelInteractionTracking(panel, options = {}) {
+      if (!panel) {
+        return;
+      }
+      const idleMs = Number(options.idleMs || DEFAULT_INTERACTION_IDLE_MS);
+      if (panel.dataset.interactionBound !== "true") {
+        panel.dataset.interactionBound = "true";
+        const activityEvents = ["focusin", "input", "change", "pointerdown", "keydown", "wheel", "touchstart"];
+        for (const eventName of activityEvents) {
+          panel.addEventListener(
+            eventName,
+            () => markPanelInteraction(panel, idleMs),
+            { passive: eventName !== "keydown" },
+          );
+        }
+      }
+      const scrollSelector = options.scrollSelector;
+      if (typeof scrollSelector === "string" && scrollSelector) {
+        const scrollElement = panel.querySelector(scrollSelector);
+        if (
+          scrollElement instanceof HTMLElement
+          && scrollElement.dataset.interactionScrollBound !== "true"
+        ) {
+          scrollElement.dataset.interactionScrollBound = "true";
+          scrollElement.addEventListener(
+            "scroll",
+            () => markPanelInteraction(panel, idleMs),
+            { passive: true },
+          );
+        }
+      }
+    }
+
+    function capturePanelState(panel, options = {}) {
+      const state = {};
+      const scrollSelector = options.scrollSelector;
+      if (typeof scrollSelector === "string" && scrollSelector) {
+        const scrollElement = panel.querySelector(scrollSelector);
+        if (scrollElement instanceof HTMLElement) {
+          state.scrollTop = scrollElement.scrollTop;
+        }
+      }
+      return state;
+    }
+
+    function restorePanelState(panel, state, options = {}) {
+      const scrollSelector = options.scrollSelector;
+      if (
+        typeof scrollSelector === "string"
+        && scrollSelector
+        && typeof state.scrollTop === "number"
+      ) {
+        const scrollElement = panel.querySelector(scrollSelector);
+        if (scrollElement instanceof HTMLElement) {
+          scrollElement.scrollTop = state.scrollTop;
+        }
+      }
+    }
+
+    function createVisibilityTracker(panel) {
+      if (!panel) {
+        return { isVisible: () => false };
+      }
+      let visible = true;
+      if ("IntersectionObserver" in window) {
+        const observer = new IntersectionObserver((entries) => {
+          for (const entry of entries) {
+            if (entry.target === panel) {
+              visible = entry.isIntersecting || entry.intersectionRatio > 0;
+            }
+          }
+        }, { rootMargin: "120px 0px 120px 0px" });
+        observer.observe(panel);
+      }
+      return {
+        isVisible() {
+          return visible;
+        },
+      };
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function formatMillions(value) {
+      const numeric = Number(value || 0);
+      if (!Number.isFinite(numeric) || numeric <= 0) {
+        return "0.00M";
+      }
+      return `${(numeric / 1_000_000).toFixed(2)}M`;
+    }
+
+    async function fetchPanelVersion(versionUrl) {
+      const response = await fetch(versionUrl, { cache: "no-store" });
+      if (!response.ok) {
+        return null;
+      }
+      const payload = await response.json();
+      return typeof payload.version === "string" ? payload.version : null;
+    }
+
+    window.dashboardPanelPolling = {
+      bindPanelInteractionTracking,
+      capturePanelState,
+      createVisibilityTracker,
+      fetchPanelVersion,
+      markPanelInteraction,
+      panelHasUnsavedChanges,
+      panelInteractionActive,
+      restorePanelState,
+      scheduleNextPoll,
+    };
+
+    function renderQueuePanel(data) {
+      const jobs = Array.isArray(data.queued_home_jobs) ? data.queued_home_jobs : [];
+      const settings = data.queue_settings || {};
+      const activeJobs = jobs.filter((job) => job.status === "running");
+      const pausedJobs = jobs.filter((job) => job.status === "paused");
+      const queuedJobs = jobs.filter((job) => job.status === "queued");
+      const activeHtml = activeJobs.length ? `
+        <div class="queue-section">
+          <div class="queue-section-header"><h3>Active</h3></div>
+          <div class="queue-list">
+            ${activeJobs.map((job) => {
+              const evalProgress = job.evaluation_progress;
+              const learningProgress = job.learning_progress;
+              const taskBlock = evalProgress ? (() => {
+                const completed = Number(evalProgress.completed_tasks || 0);
+                const total = Number(evalProgress.total_tasks || 0);
+                const width = total ? ((completed / total) * 100).toFixed(1) : "0.0";
+                return `<div class="progress-block queue-item-progress"><div class="progress-meta"><span>Tasks</span><span>${total ? `${completed}/${total}` : `${completed} done`}</span></div><div class="progress-track" aria-label="Completed evaluation tasks"><span class="progress-fill" style="width: ${width}%"></span></div></div>`;
+              })() : "";
+              const labelBlock = learningProgress && learningProgress.total_labels ? (() => {
+                const completed = Number(learningProgress.completed_labels || 0);
+                const total = Number(learningProgress.total_labels || 0);
+                const width = total ? ((completed / total) * 100).toFixed(1) : "0.0";
+                return `<div class="progress-block queue-item-progress"><div class="progress-meta"><span>Labels</span><span>${completed}/${total}</span></div><div class="progress-track" aria-label="Finished labels"><span class="progress-fill" style="width: ${width}%"></span></div></div>`;
+              })() : "";
+              return `<article class="queue-item ${job.is_queue_head ? 'is-head' : ''}"><div class="queue-item-main"><div class="queue-item-title-row"><a class="metric-title" href="${escapeHtml(job.target_url)}">${escapeHtml(job.target_label)}</a><span class="pill status-${escapeHtml(job.status)}">${escapeHtml(job.status)}</span></div><p class="metric-subtle">${escapeHtml(job.env_id || "—")} | ${escapeHtml(job.action_label || "")}</p><p class="metric-subtle">${job.started_at_display ? `Started ${escapeHtml(job.started_at_display)}` : `Created ${escapeHtml(job.created_at_display || "")}`}</p>${taskBlock}${labelBlock}</div><div class="queue-item-meta"><span class="mini-chip">${job.is_queue_head ? "Head" : "Active"}</span>${job.can_requeue ? `<form method="post" action="/jobs/${encodeURIComponent(job.job_id)}/requeue" class="queue-item-action"><input type="hidden" name="next" value="/"><button class="secondary-button small-button" type="submit">Requeue</button></form>` : ""}<a class="ghost-link" href="/jobs/${encodeURIComponent(job.job_id)}">Job</a></div></article>`;
+            }).join("")}
+          </div>
+        </div>` : "";
+      const pausedHtml = pausedJobs.length ? `
+        <div class="queue-section">
+          <div class="queue-section-header"><h3>Paused</h3></div>
+          <div class="queue-list">
+            ${pausedJobs.map((job) => {
+              const evalProgress = job.evaluation_progress;
+              const learningProgress = job.learning_progress;
+              const taskBlock = evalProgress ? (() => {
+                const completed = Number(evalProgress.completed_tasks || 0);
+                const total = Number(evalProgress.total_tasks || 0);
+                const width = total ? ((completed / total) * 100).toFixed(1) : "0.0";
+                return `<div class="progress-block queue-item-progress"><div class="progress-meta"><span>Tasks</span><span>${total ? `${completed}/${total}` : `${completed} done`}</span></div><div class="progress-track" aria-label="Completed evaluation tasks"><span class="progress-fill" style="width: ${width}%"></span></div></div>`;
+              })() : "";
+              const labelBlock = learningProgress && learningProgress.total_labels ? (() => {
+                const completed = Number(learningProgress.completed_labels || 0);
+                const total = Number(learningProgress.total_labels || 0);
+                const width = total ? ((completed / total) * 100).toFixed(1) : "0.0";
+                return `<div class="progress-block queue-item-progress"><div class="progress-meta"><span>Labels</span><span>${completed}/${total}</span></div><div class="progress-track" aria-label="Finished labels"><span class="progress-fill" style="width: ${width}%"></span></div></div>`;
+              })() : "";
+              return `<article class="queue-item ${job.is_queue_head ? 'is-head' : ''}"><div class="queue-item-main"><div class="queue-item-title-row"><a class="metric-title" href="${escapeHtml(job.target_url)}">${escapeHtml(job.target_label)}</a><span class="pill status-${escapeHtml(job.status)}">${escapeHtml(job.status)}</span></div><p class="metric-subtle">${escapeHtml(job.env_id || "—")} | ${escapeHtml(job.action_label || "")}</p><p class="metric-subtle">${job.started_at_display ? `Started ${escapeHtml(job.started_at_display)}` : `Created ${escapeHtml(job.created_at_display || "")}`}</p>${taskBlock}${labelBlock}</div><div class="queue-item-meta"><span class="mini-chip">Paused</span>${job.can_resume ? `<form method="post" action="/jobs/${encodeURIComponent(job.job_id)}/resume" class="queue-item-action"><input type="hidden" name="next" value="/"><button class="secondary-button small-button" type="submit">Resume</button></form>` : ""}${job.can_requeue ? `<form method="post" action="/jobs/${encodeURIComponent(job.job_id)}/requeue" class="queue-item-action"><input type="hidden" name="next" value="/"><button class="secondary-button small-button" type="submit">Requeue</button></form>` : ""}<a class="ghost-link" href="/jobs/${encodeURIComponent(job.job_id)}">Job</a></div></article>`;
+            }).join("")}
+          </div>
+        </div>` : "";
+      const queuedHtml = queuedJobs.length ? `
+        <div class="queue-section">
+          <div class="queue-section-header"><h3>Queued order</h3></div>
+          <div class="queue-list queue-sort-list" data-queue-sort-list data-queue-reorder-url="/jobs/queue/reorder">
+            ${queuedJobs.map((job, index) => `<article class="queue-item queue-item-draggable" draggable="true" data-queue-job-id="${encodeURIComponent(job.job_id)}"><div class="queue-item-main"><div class="queue-item-title-row"><span class="queue-drag-handle" aria-hidden="true">⋮⋮</span><a class="metric-title" href="${escapeHtml(job.target_url)}">${escapeHtml(job.target_label)}</a><span class="pill status-${escapeHtml(job.status)}">${escapeHtml(job.status)}</span></div><p class="metric-subtle">${escapeHtml(job.env_id || "—")} | ${escapeHtml(job.action_label || "")}</p><p class="metric-subtle">Created ${escapeHtml(job.created_at_display || "")}</p></div><div class="queue-item-meta"><span class="mini-chip">${(activeJobs.length + pausedJobs.length) ? `#${index + activeJobs.length + pausedJobs.length + 1}` : "Head"}</span><a class="ghost-link" href="/jobs/${encodeURIComponent(job.job_id)}">Job</a></div></article>`).join("")}
+          </div>
+        </div>` : "";
+      return `<section class="card queue-panel"><div class="card-topline"><div><p class="section-kicker">Queue</p><h2>Scheduled launches</h2></div><div class="router-summary-pills"><span class="pill">Queued ${Number(settings.queued_count || 0)}</span><span class="pill">Active ${Number(settings.active_count || 0)}/${Number(settings.max_concurrent_jobs || 1)}</span></div></div><div class="queue-controls"><form method="post" action="/jobs/queue/settings" class="queue-settings-form"><input type="hidden" name="next" value="/"><label><span class="metric-subtle">Concurrent queue jobs</span><input type="number" min="1" step="1" name="max_concurrent_jobs" value="${Number(settings.max_concurrent_jobs || 1)}"></label><label><input type="checkbox" name="enforce_single_pooltool_job" value="1"${settings.enforce_single_pooltool_job ? " checked" : ""}><span class="metric-subtle">One PoolTool job globally</span></label><button class="secondary-button small-button" type="submit">Apply</button></form></div>${jobs.length ? `${activeHtml}${pausedHtml}${queuedHtml}` : '<p class="empty inline">No queued launches.</p>'}</section>`;
+    }
+
+    function renderRecentRunsPanel(data) {
+      const recentRuns = Array.isArray(data.recent_runs) ? data.recent_runs : [];
+      if (!recentRuns.length) {
+        return '<p class="empty">No finished, failed, interrupted, or paused runs yet.</p>';
+      }
+      return `<div class="recent-run-archive">${recentRuns.map((item) => `<article class="recent-run-card"><div class="recent-run-main"><div class="recent-run-identity"><div class="metric-title"><a href="${escapeHtml(item.route)}">${escapeHtml(item.display_name)}</a></div><div class="metric-subtle recent-run-subtitle">${escapeHtml(item.subtitle)}</div><div class="metric-subtle recent-run-meta">${escapeHtml(item.meta || "")}</div></div><div class="recent-run-eval"><span class="summary-label">Eval</span><strong class="recent-run-eval-value">${escapeHtml(item.eval_display || "—")}</strong></div></div><div class="recent-run-foot"><span class="pill run-kind-${escapeHtml(item.kind)}">${escapeHtml(item.kind)}</span><div class="recent-run-head-actions">${item.status ? `<span class="pill status-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>` : ""}</div></div></article>`).join("")}</div>`;
+    }
+
+    window.dashboardPanelRenderers = {
+      renderQueuePanel,
+      renderRecentRunsPanel,
+    };
+  })();
+
+  (() => {
+    const pollUrl = "/system-resources.json";
+    const pollIntervalMs = 6000;
+    const updatedEl = document.getElementById("infrastructure-updated");
+    const cpuPercentEl = document.getElementById("system-cpu-percent");
+    const cpuFillEl = document.getElementById("system-cpu-fill");
+    const gpuPercentEl = document.getElementById("system-gpu-percent");
+    const gpuFillEl = document.getElementById("system-gpu-fill");
+    const ramPercentEl = document.getElementById("system-ram-percent");
+    const ramFillEl = document.getElementById("system-ram-fill");
+    const ramUsedEl = document.getElementById("system-ram-used");
+    const ramTotalEl = document.getElementById("system-ram-total");
+    const vramPercentEl = document.getElementById("system-vram-percent");
+    const vramFillEl = document.getElementById("system-vram-fill");
+    const vramUsedEl = document.getElementById("system-vram-used");
+    const vramTotalEl = document.getElementById("system-vram-total");
+    const tempValueEl = document.getElementById("system-temp-value");
+    const tempCpuEl = document.getElementById("system-temp-cpu");
+    const tempGpuEl = document.getElementById("system-temp-gpu");
+
+    function renderMetric(metric, percentEl, fillEl, usedEl, totalEl) {
+      if (!metric || !metric.available) {
+        percentEl.textContent = "—";
+        fillEl.style.width = "0%";
+        usedEl.textContent = "—";
+        totalEl.textContent = "/ —";
+        return;
+      }
+      percentEl.textContent = `${Number(metric.percent).toFixed(1)}%`;
+      fillEl.style.width = `${Number(metric.percent).toFixed(2)}%`;
+      usedEl.textContent = metric.used_display || "—";
+      totalEl.textContent = `/ ${metric.total_display || "—"}`;
+    }
+
+    function renderPercentMetric(metric, percentEl, fillEl) {
+      if (!percentEl || !fillEl) {
+        return;
+      }
+      if (!metric || !metric.available) {
+        percentEl.textContent = "—";
+        fillEl.style.width = "0%";
+        return;
+      }
+      percentEl.textContent = metric.percent_display || "—";
+      fillEl.style.width = `${Number(metric.percent || 0).toFixed(2)}%`;
+    }
+
+    function renderTemperature(metric) {
+      if (!tempValueEl || !tempCpuEl || !tempGpuEl) {
+        return;
+      }
+      if (!metric || !metric.available) {
+        tempValueEl.textContent = "—";
+        tempCpuEl.textContent = "CPU —";
+        tempGpuEl.textContent = "GPU —";
+        return;
+      }
+      tempValueEl.textContent = metric.hottest_display || "—";
+      tempCpuEl.textContent = `CPU ${metric.cpu_display || "—"}`;
+      tempGpuEl.textContent = `GPU ${metric.gpu_display || "—"}`;
+    }
+
+    async function poll() {
+      if (document.hidden) {
+        setTimeout(poll, window.dashboardPanelPolling.scheduleNextPoll(pollIntervalMs));
+        return;
+      }
+      try {
+        const response = await fetch(pollUrl, { cache: "no-store" });
+        if (response.ok) {
+          const payload = await response.json();
+          if (updatedEl) updatedEl.textContent = `Updated ${payload.timestamp_display || "—"}`;
+          renderPercentMetric(payload.cpu, cpuPercentEl, cpuFillEl);
+          renderPercentMetric(payload.gpu, gpuPercentEl, gpuFillEl);
+          renderMetric(payload.ram, ramPercentEl, ramFillEl, ramUsedEl, ramTotalEl);
+          renderMetric(payload.vram, vramPercentEl, vramFillEl, vramUsedEl, vramTotalEl);
+          renderTemperature(payload.temperature);
+        }
+      } catch (_error) {
+      } finally {
+        setTimeout(poll, window.dashboardPanelPolling.scheduleNextPoll(pollIntervalMs));
+      }
+    }
+
+    setTimeout(poll, window.dashboardPanelPolling.scheduleNextPoll(pollIntervalMs));
+  })();
+
+  (() => {
+    const pollIntervalMs = 20000;
+    const panel = document.getElementById("queue-panel-container");
+    if (!panel) {
+      return;
+    }
+    const pollUrl = panel.dataset.queuePanelUrl;
+    const versionUrl = panel.dataset.queuePanelVersionUrl;
+    const dataUrl = panel.dataset.queuePanelDataUrl;
+    const helpers = window.dashboardPanelPolling;
+    const renderers = window.dashboardPanelRenderers;
+    const visibility = helpers.createVisibilityTracker(panel);
+    let activeDragItem = null;
+    let knownVersion = null;
+
+    function pendingQueueItems() {
+      return Array.from(panel.querySelectorAll("[data-queue-sort-list] [data-queue-job-id]"));
+    }
+
+    function dragAfterElement(container, clientY) {
+      const candidates = pendingQueueItems().filter((item) => item !== activeDragItem);
+      let best = { offset: Number.NEGATIVE_INFINITY, element: null };
+      for (const item of candidates) {
+        const rect = item.getBoundingClientRect();
+        const offset = clientY - rect.top - rect.height / 2;
+        if (offset < 0 && offset > best.offset) {
+          best = { offset, element: item };
+        }
+      }
+      return best.element;
+    }
+
+    async function submitQueueOrder() {
+      const sortList = panel.querySelector("[data-queue-sort-list]");
+      if (!sortList) {
+        return;
+      }
+      const jobIds = pendingQueueItems().map((item) => item.dataset.queueJobId).filter(Boolean);
+      if (jobIds.length < 2) {
+        return;
+      }
+      const form = new URLSearchParams();
+      form.append("next", "/");
+      for (const jobId of jobIds) {
+        form.append("ordered_job_id", jobId);
+      }
+      try {
+        const response = await fetch(sortList.dataset.queueReorderUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-Requested-With": "dashboard-queue-reorder",
+          },
+          body: form.toString(),
+        });
+        if (response.ok) {
+          panel.innerHTML = await response.text();
+          bindQueueInteractions();
+        }
+      } catch (_error) {
+      }
+    }
+
+    function bindQueueInteractions() {
+      const sortList = panel.querySelector("[data-queue-sort-list]");
+      if (!sortList || sortList.dataset.queueBound === "true") {
+        return;
+      }
+      sortList.dataset.queueBound = "true";
+      sortList.addEventListener("dragstart", (event) => {
+        const item = event.target instanceof HTMLElement ? event.target.closest("[data-queue-job-id]") : null;
+        if (!(item instanceof HTMLElement)) {
+          return;
+        }
+        activeDragItem = item;
+        panel.dataset.queueDragging = "true";
+        item.classList.add("is-dragging");
+      });
+      sortList.addEventListener("dragend", async () => {
+        if (activeDragItem instanceof HTMLElement) {
+          activeDragItem.classList.remove("is-dragging");
+        }
+        activeDragItem = null;
+        panel.dataset.queueDragging = "false";
+        for (const item of pendingQueueItems()) {
+          item.classList.remove("queue-item-drag-target");
+        }
+        await submitQueueOrder();
+      });
+      sortList.addEventListener("dragover", (event) => {
+        if (!(activeDragItem instanceof HTMLElement)) {
+          return;
+        }
+        event.preventDefault();
+        const afterElement = dragAfterElement(sortList, event.clientY);
+        for (const item of pendingQueueItems()) {
+          item.classList.toggle("queue-item-drag-target", item === afterElement);
+        }
+        if (afterElement) {
+          sortList.insertBefore(activeDragItem, afterElement);
+        } else {
+          sortList.appendChild(activeDragItem);
+        }
+      });
+      sortList.addEventListener("drop", (event) => {
+        event.preventDefault();
+      });
+    }
+
+    helpers.bindPanelInteractionTracking(panel, {
+      idleMs: 5000,
+      scrollSelector: ".queue-panel",
+    });
+    bindQueueInteractions();
+
+    async function poll() {
+      try {
+        if (document.hidden || !visibility.isVisible()) {
+          return;
+        }
+        if (
+          panel.dataset.queueDragging === "true"
+          || helpers.panelInteractionActive(panel)
+          || helpers.panelHasUnsavedChanges(panel)
+        ) {
+          return;
+        }
+        const nextVersion = versionUrl ? await helpers.fetchPanelVersion(versionUrl) : null;
+        if (nextVersion !== null && nextVersion === knownVersion) {
+          return;
+        }
+          const response = await fetch(dataUrl || pollUrl, { cache: "no-store" });
+        if (response.ok) {
+          const state = helpers.capturePanelState(panel, {
+            scrollSelector: ".queue-panel",
+          });
+          const payload = dataUrl ? await response.json() : await response.text();
+          panel.innerHTML = dataUrl ? renderers.renderQueuePanel(payload) : payload;
+          helpers.restorePanelState(panel, state, {
+            scrollSelector: ".queue-panel",
+          });
+          helpers.bindPanelInteractionTracking(panel, {
+            idleMs: 5000,
+            scrollSelector: ".queue-panel",
+          });
+          bindQueueInteractions();
+          knownVersion = nextVersion;
+        }
+      } catch (_error) {
+      } finally {
+        setTimeout(poll, helpers.scheduleNextPoll(pollIntervalMs));
+      }
+    }
+
+    setTimeout(poll, helpers.scheduleNextPoll(pollIntervalMs));
+  })();
+
+  (() => {
+    const pollIntervalMs = 24000;
+    const panel = document.getElementById("recent-runs-panel");
+    if (!panel) {
+      return;
+    }
+    const pollUrl = panel.dataset.recentRunsUrl;
+    const versionUrl = panel.dataset.recentRunsVersionUrl;
+    const dataUrl = panel.dataset.recentRunsDataUrl;
+    const visibility = window.dashboardPanelPolling.createVisibilityTracker(panel);
+    const renderers = window.dashboardPanelRenderers;
+    let knownVersion = null;
+
+    async function poll() {
+      try {
+        if (document.hidden || !visibility.isVisible()) {
+          return;
+        }
+        const nextVersion = versionUrl ? await window.dashboardPanelPolling.fetchPanelVersion(versionUrl) : null;
+        if (nextVersion !== null && nextVersion === knownVersion) {
+          return;
+        }
+        const response = await fetch(dataUrl || pollUrl, { cache: "no-store" });
+        if (response.ok) {
+          const payload = dataUrl ? await response.json() : await response.text();
+          panel.innerHTML = dataUrl
+            ? renderers.renderRecentRunsPanel(payload)
+            : payload;
+          knownVersion = nextVersion;
+        }
+      } catch (_error) {
+      } finally {
+        setTimeout(poll, window.dashboardPanelPolling.scheduleNextPoll(pollIntervalMs));
+      }
+    }
+
+    setTimeout(poll, window.dashboardPanelPolling.scheduleNextPoll(pollIntervalMs));
+  })();
+</script>
+{% endblock %}
