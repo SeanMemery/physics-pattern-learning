@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <!-- Meta tags for social media banners -->
+  <meta name="description" content="We discover high-level structural patterns from low-level physics simulation traces by synthesizing pattern-detector programs, producing sparse annotated traces that language models can reason about.">
+  <meta property="og:title" content="Discovering High Level Patterns from Simulation Traces"/>
+  <meta property="og:description" content="Unsupervised program synthesis learns interpretable pattern detectors that translate simulation traces into sparse annotated traces, improving LM summarization, physics reasoning and reward program synthesis."/>
+  <meta property="og:url" content="https://seanmemery.github.io/physics-pattern-learning"/>
+  <meta property="og:image" content="static/images/teaser.png" />
+  <meta property="og:image:width" content="1643"/>
+  <meta property="og:image:height" content="375"/>
+
+  <meta name="twitter:title" content="Discovering High Level Patterns from Simulation Traces">
+  <meta name="twitter:description" content="Unsupervised program synthesis learns interpretable pattern detectors that translate simulation traces into sparse annotated traces for language-model reasoning.">
+  <meta name="twitter:image" content="static/images/teaser.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="keywords" content="pattern discovery, program synthesis, FunSearch, physics simulation, annotated traces, LLM reasoning, reward programs, graphics">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Discovering High Level Patterns from Simulation Traces</title>
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+
+  <link rel="stylesheet" href="static/css/bulma.min.css">
+  <link rel="stylesheet" href="static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="static/css/index.css">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="static/js/fontawesome.all.min.js"></script>
+  <script src="static/js/bulma-carousel.min.js"></script>
+  <script src="static/js/bulma-slider.min.js"></script>
+  <script src="static/js/index.js"></script>
+</head>
+<body>
+
+
+  <section class="hero">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered">
+          <div class="column has-text-centered">
+            <h1 class="title is-1 publication-title">Discovering High Level Patterns from Simulation Traces</h1>
+            <div class="is-size-5 publication-authors">
+              <!-- Paper authors -->
+              <span class="author-block"><a href="https://seanmemery.github.io" target="_blank">Sean Memery</a>,</span>
+              <span class="author-block"><a href="https://homepages.inf.ed.ac.uk/ksubr/" target="_blank">Kartic Subr</a></span>
+            </div>
+
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">University of Edinburgh<br>SIGGRAPH Asia 2026 &mdash; Conference Papers (SA '26)</span>
+            </div>
+
+            <div class="column has-text-centered">
+              <div class="publication-links">
+                <!-- Paper PDF link -->
+                <span class="link-block">
+                  <a href="https://arxiv.org/pdf/2602.10009" target="_blank"
+                  class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="fas fa-file-pdf"></i>
+                    </span>
+                    <span>Paper</span>
+                  </a>
+                </span>
+
+                <!-- arXiv abstract link -->
+                <span class="link-block">
+                  <a href="https://arxiv.org/abs/2602.10009" target="_blank"
+                  class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="ai ai-arxiv"></i>
+                    </span>
+                    <span>arXiv</span>
+                  </a>
+                </span>
+
+                <!-- Github link -->
+                <span class="link-block">
+                  <a href="https://github.com/SeanMemery/physics-pattern-learning" target="_blank"
+                  class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="fab fa-github"></i>
+                    </span>
+                    <span>Code</span>
+                  </a>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+<!-- Teaser video -->
+<section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <video poster="static/images/teaser_poster.png" id="tree" autoplay controls muted loop playsinline height="100%">
+        <source src="static/videos/teaser.mp4" type="video/mp4">
+      </video>
+      <h2 class="subtitle has-text-centered">
+        We discover high-level patterns from low-level simulation traces, giving language models a sparse, interpretable view of a physical system without fine-tuning.
+      </h2>
+    </div>
+  </div>
+</section>
+<!-- End teaser video -->
+
+
+<!-- Paper abstract -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+          <p>
+            Large Language Models (LLMs) are unable to reliably reason about specific physical systems. Attempts to imbue LLMs with knowledge of the necessary physics concepts have shown great promise, but explainability and validation remain open challenges. An emerging alternative is tooling, where LLMs can query physical simulators and use the resulting simulation traces as context for validation. This approach suffers from poor scalability since simulation traces contain large volumes of fine-grained numerical and semantic data. We show that translating simulation traces to a sparse representation of `high-level' structural patterns leads to more effective interpretation by LLMs. We propose an unsupervised learning scheme to perform this translation, or <em>annotation</em>, via program synthesis. Our learning results in a library of programs that act as <em>pattern detectors</em> which can translate simulation logs to sparse, annotated pattern sequences. The detected patterns may optionally be guided by human experts via string labels (<code>rigid collision</code>, <code>stretching spring</code>, etc.). We show, using a recent physics benchmark, that such annotated representations are more amenable to natural language reasoning about specific physical systems. The synthesised programs serve as transparent, explainable functions that map system states to a sparse and efficient annotation space. As an example application, we show how goals within physical systems that are specified in natural language may be converted to <em>reward programs</em> which are maximised to find solutions.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End paper abstract -->
+
+
+<!-- Overview figure -->
+<section class="hero is-small">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered">Overview</h2>
+      <img src="static/images/teaser.png" alt="Overview of the method: (a) pattern discovery from simulation traces guided by optional expert labels, (b) detection producing an annotation matrix, (c) downstream applications, (d) reward program synthesis for PHYRE, I-PHYRE and PoolTool."/>
+      <h2 class="subtitle has-text-centered">
+        (a) We use evolutionary programming to synthesize programs that detect high-level patterns (e.g. &ldquo;ball rolls over obstacle&rdquo;) from raw simulation states. (b) A library of such code translates a simulation trace into a matrix of pattern activations &mdash; an <em>annotated trace</em> &mdash; which is useful for (c) downstream tasks: summarization, physics planning and reward program synthesis. (d) We synthesize reward programs from natural-language goals for physical environments (PHYRE, I-PHYRE and PoolTool) and optimise them to solve tasks.
+      </h2>
+    </div>
+  </div>
+</section>
+<!-- End overview figure -->
+
+
+<!-- Method -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Method</h2>
+    <div class="columns">
+      <div class="column">
+        <div class="content has-text-justified">
+          <p>
+            Simulation traces <span class="math">&tau;</span> are dense sequences of object states. Our central observation is that <em>semantic simplification</em> of those traces lets language models connect specific simulation states to prior knowledge. Given a set of text snippets describing potential patterns &mdash; supplied by a domain expert, or by an LLM &mdash; we synthesize a program per label that detects activations of that pattern in a trace.
+          </p>
+          <p>
+            We extend <a href="https://doi.org/10.1038/s41586-023-06924-6" target="_blank">FunSearch</a> with a custom evaluation function that scores candidate detector programs by the similarity between the annotated trace they induce and the target annotation, so the library is grown by evolutionary program synthesis <em>without a supervisory dataset</em>. The resulting library of detector code maps any trace <span class="math">&tau;</span> to an Annotated Simulation Trace (AST) <span class="math">A</span> &mdash; a sparse matrix of frames against patterns.
+          </p>
+          <p>
+            Because the detectors are ordinary, readable programs, they are transparent, explainable functions from system state to annotation space. Libraries generalize across scenes but are learned per environment. For the downstream reward-program application, a scene description, the pattern library and a domain-specific language specification are combined to synthesize a reward program from a natural-language goal, which is then optimised to produce actions.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="columns is-centered">
+      <div class="column is-four-fifths">
+        <img src="static/images/ovw.png" alt="Pipeline: traces to ASTs with distance metrics, FunSearch augmentation of the library, and reward program synthesis in a DSL."/>
+        <h2 class="subtitle has-text-centered">
+          (a) Traces are mapped to annotated simulation traces by detector code, with distance metrics between traces and ASTs. (b) FunSearch with a custom evaluation function augments the library with new detector code. (c) Given a DSL, a scene description and the library, a reward program is synthesized and optimised.
+        </h2>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End method -->
+
+
+<!-- Image carousel -->
+<section class="hero is-small">
+  <div class="hero-body">
+    <div class="container">
+      <h2 class="title is-3 has-text-centered">Learned Patterns and Applications</h2>
+      <div id="results-carousel" class="carousel results-carousel">
+        <div class="item">
+          <img src="static/images/pattern_examples.png" alt="Detected patterns across PHYRE, I-PHYRE and PoolTool scenes."/>
+          <h2 class="subtitle has-text-centered">
+            Detected patterns in three DeepPHY environments. Traces are annotated with labels such as <code>bounce</code>, <code>collide</code>, <code>tip over</code>, <code>spring pull</code>, <code>cue strike</code> and <code>pocket ball</code>.
+          </h2>
+        </div>
+        <div class="item">
+          <img src="static/images/iphyre_reward_program.png" alt="Reward program synthesized for an I-PHYRE task."/>
+          <h2 class="subtitle has-text-centered">
+            A reward program synthesized from a natural-language goal in I-PHYRE, using learned patterns as events.
+          </h2>
+        </div>
+        <div class="item">
+          <img src="static/images/pooltool_reward_program.png" alt="Optimised actions for a PoolTool goal."/>
+          <h2 class="subtitle has-text-centered">
+            Optimised actions (middle row) for PoolTool tasks, using DSL programs synthesized by our method (bottom row).
+          </h2>
+        </div>
+        <div class="item">
+          <img src="static/images/phyre_reward_program.png" alt="Reward program synthesized for a PHYRE task."/>
+          <h2 class="subtitle has-text-centered">
+            Reward program synthesis in PHYRE: natural-language goals become verifiable programs over patterns.
+          </h2>
+        </div>
+        <div class="item">
+          <img src="static/images/library_size_results.png" alt="Success rate versus number of patterns in the library."/>
+          <h2 class="subtitle has-text-centered">
+            Increasing the library size improves success rates on the DeepPHY benchmarks, for both human-label and LLM-label libraries.
+          </h2>
+        </div>
+        <div class="item">
+          <img src="static/images/survey.png" alt="Human evaluation of generated summaries."/>
+          <h2 class="subtitle has-text-centered">
+            Human evaluators rated summaries generated using learned patterns higher than the DeepPHY baseline.
+          </h2>
+        </div>
+        <div class="item">
+          <img src="static/images/code_convergence.png" alt="Annotation similarity during training."/>
+          <h2 class="subtitle has-text-centered">
+            The output of learned code, measured by annotation similarity, smoothly approaches that of the final detectors over training.
+          </h2>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End image carousel -->
+
+
+<!--BibTex citation -->
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title">BibTeX</h2>
+    <pre><code>@misc{memery2026discoveringhighlevelpatterns,
+      title={Discovering High Level Patterns from Simulation Traces},
+      author={Sean Memery and Kartic Subr},
+      year={2026},
+      eprint={2602.10009},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI},
+      url={https://arxiv.org/abs/2602.10009},
+}</code></pre>
+  </div>
+</section>
+<!--End BibTex citation -->
+
+
+<footer class="footer">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content">
+          <p>
+            This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank">Academic Project Page Template</a> which was adopted from the <a href="https://nerfies.github.io" target="_blank">Nerfies</a> project page.
+            You are free to borrow the source code of this website, we just ask that you link back to this page in the footer. <br> This website is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative Commons Attribution-ShareAlike 4.0 International License</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
